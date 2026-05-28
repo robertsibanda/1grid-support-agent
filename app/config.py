@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     confidence_threshold: float = 0.85
     zonewalk_bin: str = "/usr/bin/zonewalk"
     log_level: str = "INFO"
+    mongo_uri: str = "mongodb://localhost:27017"
+    mongo_db_name: str = "1grid"
 
     @property
     def warehouse_db(self) -> str:

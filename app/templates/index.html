@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1-grid Support Agent</title>
+<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0b1120; color: #e2e8f0; display: flex; height: 100vh;
+  }
+  .sidebar {
+    width: 220px; background: #0f1729; border-right: 1px solid #1e293b;
+    display: flex; flex-direction: column; padding: 14px 10px; flex-shrink: 0; overflow-y: auto;
+  }
+  .sidebar::-webkit-scrollbar { width: 3px; }
+  .sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+  .sidebar .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding: 0 4px; flex-shrink: 0; }
+  .sidebar .logo .icon {
+    width: 30px; height: 30px; background: linear-gradient(135deg, #2563eb, #7c3aed);
+    border-radius: 7px; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #fff;
+  }
+  .sidebar .logo h1 { font-size: 13px; font-weight: 600; color: #f1f5f9; }
+  .sidebar .logo .sub { font-size: 10px; color: #64748b; }
+  .sidebar .menu { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+  .sidebar .menu .label {
+    font-size: 9px; text-transform: uppercase; letter-spacing: .08em;
+    color: #475569; margin: 10px 0 3px 8px;
+  }
+  .sidebar .menu button {
+    display: flex; align-items: center; gap: 7px; padding: 6px 8px;
+    background: transparent; border: none; color: #94a3b8; font-size: 12px;
+    border-radius: 5px; cursor: pointer; text-align: left; width: 100%; transition: all .1s;
+  }
+  .sidebar .menu button:hover { background: #1e293b; color: #e2e8f0; }
+  .sidebar .menu button.active { background: #1e293b; color: #fff; }
+  .sidebar .menu button .ico { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
+  .sidebar .status { margin-top: auto; padding-top: 10px; border-top: 1px solid #1e293b; flex-shrink: 0; }
+  .sidebar .status .row { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #64748b; padding: 2px 0; }
+  .sidebar .status .dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  .sidebar .status .dot.green { background: #22c55e; }
+  .sidebar .status .dot.red { background: #ef4444; }
+  .sidebar .status .dot.yellow { background: #eab308; }
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .toolbar {
+    padding: 8px 16px; background: #0f1729; border-bottom: 1px solid #1e293b;
+    display: flex; align-items: center; gap: 5px; flex-wrap: wrap; flex-shrink: 0; min-height: 38px;
+  }
+  .toolbar .c {
+    padding: 4px 9px; border-radius: 5px; font-size: 11px; cursor: pointer;
+    background: #1e293b; color: #94a3b8; border: 1px solid transparent; transition: all .1s; white-space: nowrap;
+  }
+  .toolbar .c:hover { border-color: #334155; color: #e2e8f0; }
+  .toolbar .c.prime { background: #1d4ed8; color: #fff; }
+  .toolbar .c.prime:hover { background: #2563eb; }
+  #panel {
+    flex: 1; overflow-y: auto; padding: 12px 16px 8px; display: flex;
+    flex-direction: column; gap: 8px;
+  }
+  #panel::-webkit-scrollbar { width: 5px; }
+  #panel::-webkit-scrollbar-track { background: transparent; }
+  #panel::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  .search-bar {
+    display: flex; gap: 8px; margin-bottom: 10px;
+  }
+  .search-bar input, .search-bar textarea {
+    flex: 1; padding: 8px 12px; border: 1px solid #334155; border-radius: 6px;
+    background: #1e293b; color: #e2e8f0; font-size: 13px; outline: none; font-family: inherit; resize: vertical;
+  }
+  .search-bar input:focus, .search-bar textarea:focus { border-color: #2563eb; }
+  .search-bar button {
+    padding: 8px 16px; background: #2563eb; color: #fff; border: none;
+    border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500; white-space: nowrap;
+  }
+  .search-bar button.sm { padding: 8px 12px; font-size: 11px; }
+  .search-bar button:hover { background: #1d4ed8; }
+  .search-bar button.green { background: #16a34a; }
+  .search-bar button.green:hover { background: #15803d; }
+  .search-bar button.amber { background: #d97706; }
+  .search-bar button.amber:hover { background: #b45309; }
+  .card {
+    background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+    padding: 10px 14px; transition: all .1s;
+  }
+  .card.clickable { cursor: pointer; }
+  .card.clickable:hover { border-color: #2563eb; }
+  .card .title { font-size: 13px; font-weight: 500; color: #f1f5f9; }
+  .card .meta { font-size: 11px; color: #64748b; margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .card .meta span { display: inline-flex; align-items: center; gap: 3px; }
+  .card .preview { font-size: 12px; color: #94a3b8; margin-top: 5px; line-height: 1.5; }
+  .card .val { font-size: 13px; color: #e2e8f0; margin-top: 2px; }
+  .card .val.green { color: #4ade80; }
+  .card .val.red { color: #f87171; }
+  .card .val.amber { color: #facc15; }
+  .card .val.mono { font-family: monospace; font-size: 12px; }
+  .detect-box {
+    background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+    padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+  }
+  .detect-box .badge { font-size: 11px; padding: 3px 10px; border-radius: 5px; font-weight: 500; }
+  .detect-box .badge.grid { background: #166534; color: #86efac; }
+  .detect-box .badge.external { background: #7c2d12; color: #fdba74; }
+  .detect-box .badge.unknown { background: #374151; color: #9ca3af; }
+  .section-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    color: #64748b; margin: 14px 0 6px 4px; font-weight: 500;
+  }
+  .details-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
+  .details-grid .k { color: #64748b; }
+  .details-grid .v { color: #e2e8f0; }
+  .details-grid .v.green { color: #4ade80; }
+  .details-grid .v.red { color: #f87171; }
+  .details-grid .v.amber { color: #facc15; }
+  .details-grid .v.mono { font-family: monospace; font-size: 12px; }
+  .flex-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .prop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; }
+  .prop-item { background: #1e293b; border: 1px solid #334155; border-radius: 6px; padding: 8px 12px; }
+  .prop-item .rname { font-size: 12px; color: #94a3b8; }
+  .prop-item .rip { font-size: 11px; color: #64748b; }
+  .prop-item .rresult { font-size: 13px; font-family: monospace; margin-top: 3px; }
+  .prop-item .rresult.green { color: #4ade80; }
+  .prop-item .rresult.red { color: #f87171; }
+  .article-view { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 16px; }
+  .article-view h2 { font-size: 16px; color: #f1f5f9; margin-bottom: 4px; }
+  .article-view .cat { font-size: 11px; color: #64748b; margin-bottom: 10px; }
+  .article-view .body { font-size: 13px; line-height: 1.7; color: #cbd5e1; white-space: pre-wrap; }
+  .article-view .back { font-size: 12px; color: #2563eb; cursor: pointer; display: inline-block; margin-bottom: 8px; }
+  .article-view .back:hover { text-decoration: underline; }
+  .welcome {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    flex: 1; text-align: center; padding: 40px 20px;
+  }
+  .welcome h2 { font-size: 18px; color: #f1f5f9; margin-bottom: 6px; }
+  .welcome p { font-size: 13px; color: #64748b; max-width: 440px; line-height: 1.6; }
+  .welcome .grid { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .welcome .grid .crd {
+    padding: 10px 16px; background: #1e293b; border-radius: 8px; cursor: pointer;
+    border: 1px solid #334155; transition: all .1s; min-width: 120px;
+  }
+  .welcome .grid .crd:hover { border-color: #2563eb; }
+  .welcome .grid .crd .t { font-size: 12px; color: #e2e8f0; font-weight: 500; }
+  .welcome .grid .crd .d { font-size: 10px; color: #64748b; margin-top: 1px; }
+  .loading { color: #64748b; font-size: 12px; padding: 20px; text-align: center; }
+  .empty { color: #475569; font-size: 13px; padding: 20px; text-align: center; }
+  .hidden { display: none !important; }
+  .result-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .result-table th { text-align: left; padding: 6px 8px; color: #64748b; font-weight: 500; border-bottom: 1px solid #334155; font-size: 11px; }
+  .result-table td { padding: 6px 8px; border-bottom: 1px solid #1e293b; color: #e2e8f0; }
+  .result-table tr:hover td { background: #1e293b; }
+  .msg { line-height: 1.6; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+  .msg.user { align-self: flex-end; background: #2563eb; color: #fff; max-width: 75%; padding: 10px 14px; border-radius: 10px; }
+  .msg.bot { max-width: 92%; }
+  .input-area {
+    padding: 8px 16px 12px; background: #0f1729; border-top: 1px solid #1e293b;
+    display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0;
+  }
+  .input-area .iw { flex: 1; display: flex; align-items: center; background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 0 12px; }
+  .input-area .iw:focus-within { border-color: #2563eb; }
+  .input-area .iw textarea { flex: 1; background: transparent; border: none; color: #e2e8f0; font-size: 13px; padding: 8px 0; outline: none; resize: none; font-family: inherit; line-height: 1.5; max-height: 80px; }
+  .input-area button { padding: 8px 20px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 500; }
+  .input-area button:disabled { opacity: .4; cursor: not-allowed; }
+  @keyframes b { 0%,80%,100% { opacity: .3; } 40% { opacity: 1; } }
+  @media (max-width: 720px) {
+    .sidebar { width: 50px; padding: 10px 5px; }
+    .sidebar .logo h1, .sidebar .logo .sub, .sidebar .menu .label, .sidebar .menu button span:not(.ico), .sidebar .status .row span:not(.dot) { display: none; }
+    .sidebar .menu button { justify-content: center; padding: 6px; }
+  }
+  .htmx-indicator { opacity: 0; transition: opacity 0.2s; }
+  .htmx-request .htmx-indicator { opacity: 1; }
+  .htmx-request.htmx-indicator { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <div class="logo">
+    <div class="icon">1G</div>
+    <div><h1>1-grid</h1><div class="sub">Support Agent</div></div>
+  </div>
+  <div class="menu">
+    <div class="label">Main</div>
+    <button class="active" onclick="loadView('dashboard')"><span class="ico">🏠</span><span>Dashboard</span></button>
+    <button onclick="loadView('chat')"><span class="ico">💬</span><span>Chat</span></button>
+    <button onclick="loadView('history')"><span class="ico">📋</span><span>History</span></button>
+    <button onclick="loadView('kb')"><span class="ico">📚</span><span>Knowledge Base</span></button>
+    <button onclick="loadView('tickets')"><span class="ico">🎫</span><span>Tickets</span></button>
+    <div class="label">Diagnose</div>
+    <button onclick="loadView('zonewalk')"><span class="ico">🌐</span><span>Zonewalk</span></button>
+    <button onclick="loadView('headers')"><span class="ico">📧</span><span>Mail Headers</span></button>
+    <button onclick="loadView('propagation')"><span class="ico">📡</span><span>Propagation</span></button>
+    <button onclick="loadView('nameservers')"><span class="ico">🔗</span><span>Nameservers</span></button>
+    <button onclick="loadView('logs')"><span class="ico">📄</span><span>Log Analysis</span></button>
+    <div class="label">Tools</div>
+    <button onclick="loadView('dns')"><span class="ico">🔎</span><span>DNS Lookup</span></button>
+    <button onclick="loadView('whois')"><span class="ico">📇</span><span>WHOIS</span></button>
+    <button onclick="loadView('ports')"><span class="ico">🔌</span><span>Port Scan</span></button>
+    <button onclick="loadView('httpcheck')"><span class="ico">🌍</span><span>HTTP Check</span></button>
+    <button onclick="loadView('subdomains')"><span class="ico">🗂️</span><span>Subdomains</span></button>
+    <button onclick="loadView('blocklists')"><span class="ico">🛡️</span><span>Blocklists</span></button>
+    <div class="label">Data</div>
+    <button onclick="loadView('conversations')"><span class="ico">💬</span><span>Conversations</span></button>
+    <button onclick="loadView('issues')"><span class="ico">🪲</span><span>Issues</span></button>
+    <button onclick="loadView('patterns')"><span class="ico">🔍</span><span>Patterns</span></button>
+    <button onclick="loadView('servers')"><span class="ico">🖥️</span><span>Servers</span></button>
+    <button onclick="loadView('quickref')"><span class="ico">⚡</span><span>Quick Ref</span></button>
+    <button onclick="loadView('status')"><span class="ico">📊</span><span>Status</span></button>
+  </div>
+  <div class="status">
+    <div class="row"><span class="dot green" id="sdot"></span><span id="sname">ok</span></div>
+    <div class="row"><span class="dot green" id="odot"></span><span id="oname">Ollama</span></div>
+  </div>
+</div>
+<div class="main">
+  <div class="toolbar" id="toolbar"></div>
+  <div id="panel" hx-indicator="#loading"></div>
+  <div id="loading" class="htmx-indicator loading">Loading...</div>
+</div>
+<script>
+  let chatHistory = [];
+  let loading = false;
+
+  function loadView(name) {
+    document.querySelectorAll('.menu button').forEach(b => b.classList.remove('active'));
+    const btn = [...document.querySelectorAll('.menu button')].find(b => b.getAttribute('onclick')?.includes("'"+name+"'") || b.getAttribute('onclick')?.includes(`'${name}'`));
+    if (btn) btn.classList.add('active');
+    document.getElementById('toolbar').innerHTML = '';
+    if (name === 'chat') { showChat(); return; }
+    htmx.ajax('GET', '/htmx/' + name, { target: '#panel', swap: 'innerHTML' });
+  }
+
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // ── CHAT ──
+  function showChat() {
+    document.getElementById('toolbar').innerHTML = `
+      <span class="c prime" onclick="doChat('purify1.co.za WordPress 403')">🔍 purify1.co.za</span>
+      <span class="c prime" onclick="doChat('lond.co.za email not receiving')">📧 lond.co.za email</span>
+      <span class="c" onclick="doChat('/kb SPF record')">📚 KB SPF</span>
+      <span class="c" onclick="doChat('/history purify1')">📋 /history</span>
+      <span class="c" onclick="doChat('/status')">📊 /status</span>
+    `;
+    document.getElementById('panel').innerHTML = `
+<div class="welcome">
+  <h2>1-grid Support Agent</h2>
+  <p>Diagnose hosting issues, search tickets, KB articles, and more. Type a domain + issue below.</p>
+  <div style="width:100%;max-width:500px;margin-top:12px">
+    <div style="display:flex;gap:8px">
+      <input id="chatInput" placeholder="e.g. purify1.co.za WordPress 403" style="flex:1;padding:10px 14px;border:1px solid #334155;border-radius:8px;background:#1e293b;color:#e2e8f0;font-size:14px;outline:none" onkeydown="if(event.key==='Enter')sendChat()">
+      <button onclick="sendChat()" style="padding:10px 20px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer">Send</button>
+    </div>
+  </div>
+</div>`;
+    document.getElementById('chatInput')?.focus();
+  }
+
+  function sendChat() {
+    const input = document.getElementById('chatInput');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    doChat(text);
+  }
+
+  function doChat(text) {
+    const panel = document.getElementById('panel');
+    if (panel.querySelector('.welcome')) panel.innerHTML = '';
+    panel.appendChild(msgEl('user', text));
+    panel.scrollTop = panel.scrollHeight;
+    typingOn();
+    fetch('/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:text}) })
+      .then(r => r.json())
+      .then(d => { typingOff(); addBotMsg(d.response || '(empty)'); })
+      .catch(() => { typingOff(); addBotMsg('Backend error: server unreachable.'); });
+  }
+
+  function msgEl(role, text) {
+    const d = document.createElement('div');
+    d.className = 'msg ' + role;
+    if (role === 'user') { d.textContent = text; return d; }
+    const lines = text.split('\n');
+    let html = '';
+    for (let line of lines) {
+      const t = line.trim();
+      if (t.startsWith('===')) html += `<div class="badge">${esc(t.replace(/=/g,'').trim())}</div>`;
+      else if (/^(OK|FAIL|WARN|INFO)\s/.test(t) || /\s(OK|FAIL|WARN|INFO)\s/.test(t)) {
+        const cls = t.includes('FAIL') ? 'fail' : t.includes('WARN') ? 'warn' : 'pass';
+        html += `<div class="${cls}">${esc(t)}</div>`;
+      } else if (t.startsWith('  -') || t.startsWith('  #') || t.startsWith('    ')) {
+        html += `<div class="mono" style="padding-left:12px">${esc(t)}</div>`;
+      } else if (t) { html += `<div>${esc(t)}</div>`; }
+      else { html += '<div style="height:3px"></div>'; }
+    }
+    d.innerHTML = html;
+    return d;
+  }
+
+  function addBotMsg(text) {
+    document.getElementById('panel').appendChild(msgEl('bot', text));
+    document.getElementById('panel').scrollTop = document.getElementById('panel').scrollHeight;
+  }
+
+  function typingOn() {
+    const d = document.createElement('div'); d.className = 'msg bot'; d.id = 'typing';
+    d.innerHTML = '<div style="display:flex;gap:4px;padding:4px 0"><span style="width:6px;height:6px;background:#94a3b8;border-radius:50%;animation:b 1.2s infinite"></span><span style="width:6px;height:6px;background:#94a3b8;border-radius:50%;animation:b 1.2s infinite;animation-delay:.2s"></span><span style="width:6px;height:6px;background:#94a3b8;border-radius:50%;animation:b 1.2s infinite;animation-delay:.4s"></span></div>';
+    document.getElementById('panel').appendChild(d);
+    document.getElementById('panel').scrollTop = document.getElementById('panel').scrollHeight;
+  }
+  function typingOff() { document.getElementById('typing')?.remove(); }
+
+  // ── INIT ──
+  if (window.location.protocol === 'file:') {
+    document.getElementById('panel').innerHTML = `<div class="card" style="border-color:#ef4444;padding:20px;text-align:center;margin-top:40px">
+      <div style="font-size:18px;color:#f87171;margin-bottom:8px">⚠ Cannot Load</div>
+      <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">Open <b>http://localhost:8000</b> instead of the file.</div>
+    </div>`;
+  } else {
+    loadView('dashboard');
+    fetch('/health').then(r=>r.json()).then(() => {}).catch(() => { document.getElementById('sdot').className='dot red'; document.getElementById('sname').textContent='offline'; });
+    fetch('/health/ollama').then(r=>r.json()).then(d => { document.getElementById('oname').textContent = d.status==='ok' ? 'Ollama: on' : 'Ollama: off'; document.getElementById('odot').className = d.status==='ok' ? 'dot green' : 'dot yellow'; }).catch(() => { document.getElementById('odot').className='dot red'; document.getElementById('oname').textContent='Ollama: err'; });
+  }
+</script>
+</body>
+</html>

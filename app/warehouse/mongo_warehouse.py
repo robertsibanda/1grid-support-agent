@@ -13,12 +13,9 @@ logger = logging.getLogger(__name__)
 class MongoWarehouse:
     """MongoDB document warehouse for the 1grid support system."""
 
-    URI = "mongodb://localhost:27017"
-    DB_NAME = "1grid"
-
-    def __init__(self):
-        self.client = pymongo.MongoClient(self.URI)
-        self.db = self.client[self.DB_NAME]
+    def __init__(self, uri: str = "mongodb://localhost:27017", db_name: str = "1grid"):
+        self.client = pymongo.MongoClient(uri)
+        self.db = self.client[db_name]
 
         # collections
         self.tickets = self.db["tickets"]

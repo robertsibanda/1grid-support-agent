@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from app.config import settings
 from app.agent.pipeline import SupportPipeline
@@ -13,6 +13,7 @@ from app.rag.chroma_client import ChromaService
 from app.rag.kb_ingest import ingest_all_kb, ingest_from_warehouse
 from app.rag.retriever import retrieve_context_structured
 from app.warehouse.mongo_warehouse import MongoWarehouse
+from app.htmx_views import router as htmx_router, init_wh as htmx_init_wh
 from app.zonewalk.runner import run_zonewalk, run_dig, run_whois
 from app.zonewalk.runner import (
     run_zonewalk_full, parse_email_headers, check_propagation,
@@ -25,7 +26,8 @@ logger = logging.getLogger(__name__)
 
 pipeline = SupportPipeline()
 chroma = ChromaService()
-warehouse = MongoWarehouse()
+warehouse = MongoWarehouse(uri=settings.mongo_uri, db_name=settings.mongo_db_name)
+htmx_init_wh(warehouse)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -62,6 +64,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(htmx_router)
 
 # --- Request Models ---
 
@@ -375,7 +379,8 @@ async def quickref_by_category():
 
 @app.get("/")
 async def index():
-    return FileResponse("static/index.html")
+    with open("app/templates/index.html", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
