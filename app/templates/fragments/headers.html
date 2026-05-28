@@ -1,0 +1,7 @@
+<div style="display:flex;flex-direction:column;gap:8px;height:100%">
+  <div style="font-size:12px;color:#94a3b8">Paste raw email headers below. Parses SPF, DKIM, DMARC, Received chain, and block reasons.</div>
+  <textarea id="mh" name="headers" placeholder="Paste email headers here..." style="min-height:140px;padding:10px;border:1px solid #334155;border-radius:6px;background:#1e293b;color:#e2e8f0;font-size:12px;font-family:monospace;outline:none;resize:vertical"></textarea>
+  <div><button hx-post="/views/headers/analyze" hx-include="#mh" hx-target="#mhres" hx-indicator="#mhload" style="padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500">Analyze Headers</button></div>
+  <div id="mhload" class="htmx-indicator loading">Analyzing...</div>
+  <div id="mhres"></div>
+</div>

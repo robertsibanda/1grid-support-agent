@@ -1,0 +1,16 @@
+<div id="toolbar">
+  <span class="c" hx-get="/views/tickets" hx-target="#panel" hx-swap="innerHTML">← Back</span>
+  <span class="c prime" hx-get="/views/zonewalk" hx-target="#panel" hx-swap="innerHTML">🌐 Zonewalk</span>
+</div>
+<div class="search-bar">
+  <input id="hq" name="q" placeholder="Search domain..." hx-trigger="keyup changed delay:500ms" hx-target="#hres" hx-post="/views/history/search">
+  <button hx-post="/views/history/search" hx-include="#hq" hx-target="#hres">Search</button>
+</div>
+<div id="hres" hx-trigger="load" hx-get="/views/history/search?q=" hx-target="this"></div>
+<script>
+  htmx.on('htmx:load', function(evt) {
+    var el = evt.detail.elt;
+    var inp = el.querySelector('#hq');
+    if (inp) inp.focus();
+  });
+</script>

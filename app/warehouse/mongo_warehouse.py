@@ -6,6 +6,7 @@ from datetime import datetime
 
 import pymongo
 from bson import ObjectId
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +14,9 @@ logger = logging.getLogger(__name__)
 class MongoWarehouse:
     """MongoDB document warehouse for the 1grid support system."""
 
-    def __init__(self, uri: str = "mongodb://localhost:27017", db_name: str = "1grid"):
-        self.client = pymongo.MongoClient(uri)
-        self.db = self.client[db_name]
+    def __init__(self):
+        self.client = pymongo.MongoClient(settings.mongo_uri)
+        self.db = self.client[settings.mongo_db]
 
         # collections
         self.tickets = self.db["tickets"]
@@ -27,6 +28,94 @@ class MongoWarehouse:
         self.canned = self.db["canned"]
         self.sops = self.db["sops"]
         self.patterns = self.db["patterns"]
+        self.kb_articles = self.db["kb_articles"]
+        self.robert_conversations = self.db["robert_conversations"]
+        self.usage_log = self.db["usage_log"]
+        self.zonewalk_results = self.db["zonewalk_results"]
+
+    def log_chat(self, session_id: str, user_message: str, assistant_response: str,
+                 domain: str = "", model: str = "",
+                 actions_taken: list = None, warehouse_context: str = "",
+                 zonewalk_result: str = ""):
+        """Persist every chat exchange with full context for audit trail."""
+        try:
+            self.robert_conversations.insert_one({
+                "session_id": session_id,
+                "type": "chat_exchange",
+                "user_message": user_message,
+                "assistant_response": assistant_response,
+                "domain": domain,
+                "model": model,
+                "actions_taken": actions_taken or [],
+                "warehouse_context_snippet": warehouse_context[:500],
+                "zonewalk_result": zonewalk_result[:500] if zonewalk_result else "",
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            })
+        except Exception as e:
+            logger.warning(f"Failed to log chat: {e}")
+
+    def log_usage(self, action: str, detail: str = "", metadata: dict = None):
+        """Log portal usage to MongoDB for history tracking."""
+        try:
+            self.usage_log.insert_one({
+                "action": action,
+                "detail": detail,
+                "metadata": metadata or {},
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        except Exception as e:
+            logger.warning(f"Failed to log usage: {e}")
+
+    # ------------------------------------------------------------------
+    # ZONEWALK RESULTS
+    # ------------------------------------------------------------------
+    def save_zonewalk_result(self, domain: str, result: dict):
+        """Save a full zonewalk result to MongoDB for AI reference."""
+        try:
+            doc = {
+                "domain": domain.lower(),
+                "timestamp": datetime.utcnow().isoformat(),
+                **result
+            }
+            doc.pop("_id", None)
+            self.zonewalk_results.insert_one(doc)
+            self.zonewalk_results.create_index("domain")
+            self.zonewalk_results.create_index("timestamp")
+        except Exception as e:
+            logger.warning(f"Failed to save zonewalk result: {e}")
+
+    def get_zonewalk_results(self, domain: str, limit: int = 5):
+        """Get past zonewalk results for a domain, newest first."""
+        try:
+            pat = re.compile(re.escape(domain.lower()), re.IGNORECASE)
+            cursor = self.zonewalk_results.find(
+                {"domain": {"$regex": pat}}
+            ).sort("timestamp", pymongo.DESCENDING).limit(limit)
+            return [self._serialize(d) for d in cursor]
+        except Exception as e:
+            logger.warning(f"Failed to get zonewalk results: {e}")
+            return []
+
+    def search_zonewalk_results(self, q: str = "", limit: int = 20):
+        """Search zonewalk results by domain or any field."""
+        try:
+            if not q:
+                cursor = self.zonewalk_results.find().sort("timestamp", pymongo.DESCENDING).limit(limit)
+            else:
+                pat = re.compile(re.escape(q), re.IGNORECASE)
+                cursor = self.zonewalk_results.find({
+                    "$or": [
+                        {"domain": pat},
+                        {"hosting_provider": pat},
+                        {"a_records": pat},
+                        {"nameservers": pat},
+                        {"ptr_record": pat},
+                    ]
+                }).sort("timestamp", pymongo.DESCENDING).limit(limit)
+            return [self._serialize(d) for d in cursor]
+        except Exception as e:
+            logger.warning(f"Failed to search zonewalk results: {e}")
+            return []
 
     # ------------------------------------------------------------------
     # IMPORT from SQLite
@@ -240,6 +329,38 @@ class MongoWarehouse:
         cursor = self.conversations.find().sort("timestamp", pymongo.DESCENDING).limit(limit)
         return [self._serialize(d) for d in cursor]
 
+    def search_conversations_by_domain(self, domain: str, limit: int = 20):
+        import re
+        pat = re.compile(re.escape(domain), re.IGNORECASE)
+        results = []
+        cursor = self.conversations.find(
+            {"metadata.domain": pat}
+        ).sort("timestamp", pymongo.DESCENDING).limit(limit)
+        for d in cursor:
+            d["_conv_type"] = "conversation"
+            results.append(self._serialize(d))
+        cursor2 = self.robert_conversations.find(
+            {"domain": pat}
+        ).sort("timestamp", pymongo.DESCENDING).limit(limit)
+        for d in cursor2:
+            d["_conv_type"] = "robert_conversation"
+            results.append(self._serialize(d))
+        results.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        return results[:limit]
+
+    def get_usage_history(self, action: str = "", domain: str = "", limit: int = 50):
+        q = {}
+        if action:
+            q["action"] = action
+        if domain:
+            pat = re.compile(re.escape(domain), re.IGNORECASE)
+            q["$or"] = [
+                {"detail": pat},
+                {"metadata.domain": pat}
+            ]
+        cursor = self.usage_log.find(q).sort("timestamp", pymongo.DESCENDING).limit(limit)
+        return [self._serialize(d) for d in cursor]
+
     # ------------------------------------------------------------------
     # GENERIC SEARCH
     # ------------------------------------------------------------------
@@ -258,6 +379,31 @@ class MongoWarehouse:
         return results
 
     # ------------------------------------------------------------------
+    # KB ARTICLES
+    # ------------------------------------------------------------------
+    def search_kb(self, query: str, limit: int = 15):
+        if not query:
+            return [self._serialize(d) for d in self.kb_articles.find().limit(limit)]
+        import re
+        pat = re.compile(re.escape(query), re.IGNORECASE)
+        cursor = (self.kb_articles.find(
+            {"$or": [
+                {"title": pat},
+                {"content": pat},
+                {"category": pat},
+                {"tags": pat},
+                {"keywords": pat},
+            ]}
+        ).limit(limit))
+        return [self._serialize(d) for d in cursor]
+
+    def get_kb_article(self, title: str):
+        import re
+        pat = re.compile(f"^{re.escape(title)}$", re.IGNORECASE)
+        doc = self.kb_articles.find_one({"title": pat})
+        return self._serialize(doc) if doc else None
+
+    # ------------------------------------------------------------------
     # COUNTS
     # ------------------------------------------------------------------
     def counts(self):
@@ -271,6 +417,8 @@ class MongoWarehouse:
             "canned": self.canned.count_documents({}),
             "sops": self.sops.count_documents({}),
             "patterns": self.patterns.count_documents({}),
+            "kb_articles": self.kb_articles.count_documents({}),
+            "usage_log": self.usage_log.count_documents({}),
         }
 
     # ------------------------------------------------------------------

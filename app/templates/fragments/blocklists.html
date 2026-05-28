@@ -1,0 +1,8 @@
+<div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Check an IP address against DNS blocklists (Spamhaus, SpamCop, SORBS, Barracuda, PSBL)</div>
+<div class="search-bar">
+  <input id="bld" name="ip" placeholder="IP address (e.g. 1.2.3.4)">
+  <button hx-post="/views/blocklists/check" hx-include="#bld" hx-target="#blres" hx-indicator="#blload">Check</button>
+</div>
+<div id="blload" class="htmx-indicator loading">Checking blocklists...</div>
+<div id="blres"></div>
+<script>htmx.on('htmx:load',function(e){var i=e.detail.elt.querySelector('#bld');if(i)i.focus()})</script>

@@ -1,0 +1,7 @@
+<div style="display:flex;flex-direction:column;gap:8px;height:100%">
+  <div style="font-size:12px;color:#94a3b8">Paste error logs, access logs, or any text. Detects PHP errors, MySQL, HTTP codes, WordPress, timeouts, disk/memory limits.</div>
+  <textarea id="lg" name="content" placeholder="Paste log content here..." style="min-height:160px;padding:10px;border:1px solid #334155;border-radius:6px;background:#1e293b;color:#e2e8f0;font-size:12px;font-family:monospace;outline:none;resize:vertical"></textarea>
+  <div><button hx-post="/views/logs/analyze" hx-include="#lg" hx-target="#lgres" hx-indicator="#lgload" style="padding:8px 20px;background:#d97706;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500">Analyze Logs</button></div>
+  <div id="lgload" class="htmx-indicator loading">Analyzing...</div>
+  <div id="lgres"></div>
+</div>

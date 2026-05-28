@@ -8,12 +8,17 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 class Settings(BaseSettings):
     ollama_url: str = "http://localhost:11434"
-    ollama_model: str = "llama3.1:8b"
+    ollama_model: str = "phi3:mini"
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.1-8b-instant"
     confidence_threshold: float = 0.85
     zonewalk_bin: str = "/usr/bin/zonewalk"
     log_level: str = "INFO"
     mongo_uri: str = "mongodb://localhost:27017"
-    mongo_db_name: str = "1grid"
+    mongo_db: str = "support_ai"
+    freshdesk_api_key: str = ""
+    freshdesk_domain: str = ""
+    n8n_webhook_url: str = ""
 
     @property
     def warehouse_db(self) -> str:

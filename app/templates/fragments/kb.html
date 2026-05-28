@@ -1,0 +1,8 @@
+<div class="search-bar">
+  <input id="kbq" name="q" placeholder="Search KB articles..." hx-trigger="keyup changed delay:500ms" hx-target="#kbres" hx-post="/views/kb/search" hx-indicator="#kbload">
+  <button hx-post="/views/kb/search" hx-include="#kbq" hx-target="#kbres" hx-indicator="#kbload">Search</button>
+  <button class="green sm" hx-post="/views/kb/search" hx-vals='{"q":"email dns security domain hosting backup"}' hx-target="#kbres" hx-indicator="#kbload">Browse All</button>
+</div>
+<div id="kbload" class="htmx-indicator loading">Searching KB...</div>
+<div id="kbres" hx-trigger="load" hx-post="/views/kb/search" hx-vals='{"q":"email dns security domain"}' hx-target="this"></div>
+<script>htmx.on('htmx:load',function(e){var i=e.detail.elt.querySelector('#kbq');if(i)i.focus()})</script>

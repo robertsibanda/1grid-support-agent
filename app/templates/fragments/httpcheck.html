@@ -1,0 +1,8 @@
+<div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Check HTTP, HTTPS response codes and SSL certificate expiry</div>
+<div class="search-bar">
+  <input id="hcd" name="domain" placeholder="Domain (e.g. example.co.za)">
+  <button hx-post="/views/httpcheck/check" hx-include="#hcd" hx-target="#hcres" hx-indicator="#hcload">Check</button>
+</div>
+<div id="hcload" class="htmx-indicator loading">Checking...</div>
+<div id="hcres"></div>
+<script>htmx.on('htmx:load',function(e){var i=e.detail.elt.querySelector('#hcd');if(i)i.focus()})</script>

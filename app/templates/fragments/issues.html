@@ -1,0 +1,6 @@
+<div class="search-bar">
+  <input id="isq" name="q" placeholder="Search issues by domain, ticket ref, or keyword..." hx-trigger="keyup changed delay:500ms" hx-target="#isres" hx-post="/views/issues/search">
+  <button hx-post="/views/issues/search" hx-include="#isq" hx-target="#isres">Search</button>
+</div>
+<div id="isres" hx-trigger="load" hx-get="/views/issues/search?q=" hx-target="this"></div>
+<script>htmx.on('htmx:load',function(e){var i=e.detail.elt.querySelector('#isq');if(i)i.focus()})</script>

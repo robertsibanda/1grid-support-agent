@@ -1,0 +1,8 @@
+<div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Enumerate common subdomains (www, mail, cpanel, ftp, api, etc.)</div>
+<div class="search-bar">
+  <input id="sbd" name="domain" placeholder="Domain">
+  <button hx-post="/views/subdomains/enum" hx-include="#sbd" hx-target="#sbres" hx-indicator="#sbload">Enumerate</button>
+</div>
+<div id="sbload" class="htmx-indicator loading">Enumerating...</div>
+<div id="sbres"></div>
+<script>htmx.on('htmx:load',function(e){var i=e.detail.elt.querySelector('#sbd');if(i)i.focus()})</script>

@@ -1,3 +1,4 @@
+import json
 import httpx
 from app.config import settings
 
@@ -45,6 +46,26 @@ class OllamaClient:
             resp.raise_for_status()
             data = resp.json()
             return data["message"]["content"]
+
+    async def chat_stream(self, messages: list[dict], temperature: float = 0.1):
+        async with httpx.AsyncClient(timeout=300) as client:
+            payload = {
+                "model": self.model,
+                "messages": [{"role": "system", "content": SYSTEM_PROMPT}] + messages,
+                "stream": True,
+                "temperature": temperature,
+            }
+            async with client.stream("POST", f"{self.base_url}/api/chat", json=payload) as resp:
+                async for line in resp.aiter_lines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                        if "message" in data and "content" in data["message"]:
+                            yield data["message"]["content"]
+                    except json.JSONDecodeError:
+                        continue
 
     async def diagnose(self, domain: str, issue: str, zonewalk_output: str,
                        kb_context: str, warehouse_history: str) -> dict:

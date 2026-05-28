@@ -1,0 +1,5 @@
+<div class="search-bar">
+  <input id="cvq" name="q" placeholder="Search conversations..." hx-trigger="keyup changed delay:500ms" hx-target="#cvres" hx-post="/views/conversations/search">
+  <button hx-post="/views/conversations/search" hx-include="#cvq" hx-target="#cvres">Search</button>
+</div>
+<div id="cvres" hx-trigger="load" hx-get="/views/conversations/search?q=" hx-target="this"></div>

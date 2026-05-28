@@ -1,0 +1,8 @@
+<div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Scan common TCP ports (FTP, SSH, SMTP, HTTP, HTTPS, cPanel, MySQL, etc.)</div>
+<div class="search-bar">
+  <input id="ptd" name="domain" placeholder="Domain or IP">
+  <button hx-post="/views/ports/scan" hx-include="#ptd" hx-target="#ptres" hx-indicator="#ptload">Scan Ports</button>
+</div>
+<div id="ptload" class="htmx-indicator loading">Scanning ports...</div>
+<div id="ptres"></div>
+<script>htmx.on('htmx:load',function(e){var i=e.detail.elt.querySelector('#ptd');if(i)i.focus()})</script>

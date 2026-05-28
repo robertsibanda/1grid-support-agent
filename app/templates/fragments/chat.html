@@ -1,0 +1,18 @@
+<div id="chat-panel" style="display:flex;flex-direction:column;height:100%">
+  <div id="chat-messages" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-bottom:8px">
+    <div class="welcome" style="padding:20px;min-height:200px">
+      <h2>AI Support Chat</h2>
+      <p>Type a domain + issue (e.g. <em>example.co.za email not receiving</em>) or use /commands.</p>
+      <div class="grid" style="margin-top:12px">
+        <a href="#" class="crd" onclick="document.getElementById('input').value='example.co.za email not working';document.getElementById('inputArea').hidden=false;document.getElementById('input').focus()"><div class="t">📧 Email</div><div class="d">Test domain</div></a>
+        <a href="#" class="crd" onclick="document.getElementById('input').value='/status';document.getElementById('inputArea').hidden=false;document.getElementById('input').focus()"><div class="t">📊 /status</div><div class="d">System status</div></a>
+        <a href="#" class="crd" onclick="document.getElementById('input').value='/help';document.getElementById('inputArea').hidden=false;document.getElementById('input').focus()"><div class="t">❓ /help</div><div class="d">Commands</div></a>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.getElementById('inputArea').hidden = false;
+  document.getElementById('input').focus();
+  document.getElementById('toolbar').innerHTML = '';
+</script>

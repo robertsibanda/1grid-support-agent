@@ -1,0 +1,2 @@
+<input id="qrf" name="q" style="width:100%;padding:8px 12px;border:1px solid #334155;border-radius:6px;background:#1e293b;color:#e2e8f0;font-size:13px;outline:none;margin-bottom:8px" placeholder="Filter references..." hx-trigger="keyup changed delay:300ms" hx-target="#qrlist" hx-post="/views/quickref/filter">
+<div id="qrlist" hx-trigger="load" hx-get="/views/quickref/filter?q=" hx-target="this"></div>

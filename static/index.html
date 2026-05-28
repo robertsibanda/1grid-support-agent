@@ -4,249 +4,167 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>1-grid Support Agent</title>
+<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<script src="https://unpkg.com/htmx.org@2.0.4/dist/ext/response-targets.js"></script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: #0b1120; color: #e2e8f0; display: flex; height: 100vh;
-  }
-  .sidebar {
-    width: 220px; background: #0f1729; border-right: 1px solid #1e293b;
-    display: flex; flex-direction: column; padding: 14px 10px; flex-shrink: 0; overflow-y: auto;
-  }
-  .sidebar::-webkit-scrollbar { width: 3px; }
-  .sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
-  .sidebar .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding: 0 4px; flex-shrink: 0; }
-  .sidebar .logo .icon {
-    width: 30px; height: 30px; background: linear-gradient(135deg, #2563eb, #7c3aed);
-    border-radius: 7px; display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 700; color: #fff;
-  }
-  .sidebar .logo h1 { font-size: 13px; font-weight: 600; color: #f1f5f9; }
-  .sidebar .logo .sub { font-size: 10px; color: #64748b; }
-  .sidebar .menu { flex: 1; display: flex; flex-direction: column; gap: 1px; }
-  .sidebar .menu .label {
-    font-size: 9px; text-transform: uppercase; letter-spacing: .08em;
-    color: #475569; margin: 10px 0 3px 8px;
-  }
-  .sidebar .menu button {
-    display: flex; align-items: center; gap: 7px; padding: 6px 8px;
-    background: transparent; border: none; color: #94a3b8; font-size: 12px;
-    border-radius: 5px; cursor: pointer; text-align: left; width: 100%; transition: all .1s;
-  }
-  .sidebar .menu button:hover { background: #1e293b; color: #e2e8f0; }
-  .sidebar .menu button.active { background: #1e293b; color: #fff; }
-  .sidebar .menu button .ico { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
-  .sidebar .status { margin-top: auto; padding-top: 10px; border-top: 1px solid #1e293b; flex-shrink: 0; }
-  .sidebar .status .row { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #64748b; padding: 2px 0; }
-  .sidebar .status .dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-  .sidebar .status .dot.green { background: #22c55e; }
-  .sidebar .status .dot.red { background: #ef4444; }
-  .sidebar .status .dot.yellow { background: #eab308; }
-
-  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  .toolbar {
-    padding: 8px 16px; background: #0f1729; border-bottom: 1px solid #1e293b;
-    display: flex; align-items: center; gap: 5px; flex-wrap: wrap; flex-shrink: 0;
-  }
-  .toolbar .c {
-    padding: 4px 9px; border-radius: 5px; font-size: 11px; cursor: pointer;
-    background: #1e293b; color: #94a3b8; border: 1px solid transparent; transition: all .1s; white-space: nowrap;
-  }
-  .toolbar .c:hover { border-color: #334155; color: #e2e8f0; }
-  .toolbar .c.prime { background: #1d4ed8; color: #fff; }
-  .toolbar .c.prime:hover { background: #2563eb; }
-
-  #panel {
-    flex: 1; overflow-y: auto; padding: 12px 16px 8px; display: flex;
-    flex-direction: column; gap: 8px;
-  }
-  #panel::-webkit-scrollbar { width: 5px; }
-  #panel::-webkit-scrollbar-track { background: transparent; }
-  #panel::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-
-  .search-bar {
-    display: flex; gap: 8px; margin-bottom: 10px;
-  }
-  .search-bar input, .search-bar textarea {
-    flex: 1; padding: 8px 12px; border: 1px solid #334155; border-radius: 6px;
-    background: #1e293b; color: #e2e8f0; font-size: 13px; outline: none; font-family: inherit; resize: vertical;
-  }
-  .search-bar input:focus, .search-bar textarea:focus { border-color: #2563eb; }
-  .search-bar button {
-    padding: 8px 16px; background: #2563eb; color: #fff; border: none;
-    border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500; white-space: nowrap;
-  }
-  .search-bar button.sm { padding: 8px 12px; font-size: 11px; }
-  .search-bar button:hover { background: #1d4ed8; }
-  .search-bar button.green { background: #16a34a; }
-  .search-bar button.green:hover { background: #15803d; }
-  .search-bar button.amber { background: #d97706; }
-  .search-bar button.amber:hover { background: #b45309; }
-
-  .card {
-    background: #1e293b; border: 1px solid #334155; border-radius: 8px;
-    padding: 10px 14px; transition: all .1s;
-  }
-  .card.clickable { cursor: pointer; }
-  .card.clickable:hover { border-color: #2563eb; }
-  .card .title { font-size: 13px; font-weight: 500; color: #f1f5f9; }
-  .card .meta { font-size: 11px; color: #64748b; margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap; }
-  .card .meta span { display: inline-flex; align-items: center; gap: 3px; }
-  .card .preview { font-size: 12px; color: #94a3b8; margin-top: 5px; line-height: 1.5; }
-  .card .val { font-size: 13px; color: #e2e8f0; margin-top: 2px; }
-  .card .val.green { color: #4ade80; }
-  .card .val.red { color: #f87171; }
-  .card .val.amber { color: #facc15; }
-  .card .val.mono { font-family: monospace; font-size: 12px; }
-
-  .msg { line-height: 1.6; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
-  .msg.user {
-    align-self: flex-end; background: #2563eb; color: #fff; max-width: 75%;
-    padding: 10px 14px; border-radius: 10px;
-  }
-  .msg.bot { max-width: 92%; }
-  .msg .badge {
-    display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px;
-    background: #374151; color: #94a3b8; margin: 8px 0 4px; font-weight: 500;
-  }
-  .msg .pass { color: #4ade80; }
-  .msg .fail { color: #f87171; }
-  .msg .warn { color: #facc15; }
-  .msg .mono { font-family: monospace; font-size: 12px; color: #94a3b8; }
-
-  .input-area {
-    padding: 8px 16px 12px; background: #0f1729; border-top: 1px solid #1e293b;
-    display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0;
-  }
-  .input-area .iw {
-    flex: 1; display: flex; align-items: center; background: #1e293b;
-    border: 1px solid #334155; border-radius: 8px; padding: 0 12px;
-  }
-  .input-area .iw:focus-within { border-color: #2563eb; }
-  .input-area .iw textarea {
-    flex: 1; background: transparent; border: none; color: #e2e8f0; font-size: 13px;
-    padding: 8px 0; outline: none; resize: none; font-family: inherit; line-height: 1.5;
-    max-height: 80px;
-  }
-  .input-area button {
-    padding: 8px 20px; background: #2563eb; color: #fff; border: none;
-    border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 500;
-  }
-  .input-area button:disabled { opacity: .4; cursor: not-allowed; }
-
-  .detect-box {
-    background: #1e293b; border: 1px solid #334155; border-radius: 8px;
-    padding: 12px 16px; display: flex; align-items: center; gap: 12px;
-  }
-  .detect-box .badge { font-size: 11px; padding: 3px 10px; border-radius: 5px; font-weight: 500; }
-  .detect-box .badge.grid { background: #166534; color: #86efac; }
-  .detect-box .badge.external { background: #7c2d12; color: #fdba74; }
-  .detect-box .badge.unknown { background: #374151; color: #9ca3af; }
-
-  .prop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; }
-  .prop-item { background: #1e293b; border: 1px solid #334155; border-radius: 6px; padding: 8px 12px; }
-  .prop-item .rname { font-size: 12px; color: #94a3b8; }
-  .prop-item .rip { font-size: 11px; color: #64748b; }
-  .prop-item .rresult { font-size: 13px; font-family: monospace; margin-top: 3px; }
-  .prop-item .rresult.green { color: #4ade80; }
-  .prop-item .rresult.red { color: #f87171; }
-
-  .result-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .result-table th { text-align: left; padding: 6px 8px; color: #64748b; font-weight: 500; border-bottom: 1px solid #334155; font-size: 11px; }
-  .result-table td { padding: 6px 8px; border-bottom: 1px solid #1e293b; color: #e2e8f0; }
-  .result-table tr:hover td { background: #1e293b; }
-
-  .section-label {
-    font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
-    color: #64748b; margin: 14px 0 6px 4px; font-weight: 500;
-  }
-
-  .details-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
-  .details-grid .k { color: #64748b; }
-  .details-grid .v { color: #e2e8f0; }
-  .details-grid .v.green { color: #4ade80; }
-  .details-grid .v.red { color: #f87171; }
-  .details-grid .v.amber { color: #facc15; }
-  .details-grid .v.mono { font-family: monospace; font-size: 12px; }
-
-  .flex-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-
-  .article-view {
-    background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 16px;
-  }
-  .article-view h2 { font-size: 16px; color: #f1f5f9; margin-bottom: 4px; }
-  .article-view .cat { font-size: 11px; color: #64748b; margin-bottom: 10px; }
-  .article-view .body { font-size: 13px; line-height: 1.7; color: #cbd5e1; white-space: pre-wrap; }
-  .article-view .back { font-size: 12px; color: #2563eb; cursor: pointer; margin-bottom: 8px; display: inline-block; }
-  .article-view .back:hover { text-decoration: underline; }
-
-  .welcome {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    flex: 1; text-align: center; padding: 40px 20px;
-  }
-  .welcome h2 { font-size: 18px; color: #f1f5f9; margin-bottom: 6px; }
-  .welcome p { font-size: 13px; color: #64748b; max-width: 440px; line-height: 1.6; }
-  .welcome .grid { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-  .welcome .grid .crd {
-    padding: 10px 16px; background: #1e293b; border-radius: 8px; cursor: pointer;
-    border: 1px solid #334155; transition: all .1s; min-width: 120px;
-  }
-  .welcome .grid .crd:hover { border-color: #2563eb; }
-  .welcome .grid .crd .t { font-size: 12px; color: #e2e8f0; font-weight: 500; }
-  .welcome .grid .crd .d { font-size: 10px; color: #64748b; margin-top: 1px; }
-
-  .loading { color: #64748b; font-size: 12px; padding: 20px; text-align: center; }
-  .empty { color: #475569; font-size: 13px; padding: 20px; text-align: center; }
-  .hidden { display: none !important; }
-
-  @keyframes b { 0%,80%,100% { opacity: .3; } 40% { opacity: 1; } }
-
-  @media (max-width: 720px) {
-    .sidebar { width: 50px; padding: 10px 5px; }
-    .sidebar .logo h1, .sidebar .logo .sub, .sidebar .menu .label, .sidebar .menu button span:not(.ico), .sidebar .status .row span:not(.dot) { display: none; }
-    .sidebar .menu button { justify-content: center; padding: 6px; }
-  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#0b1120;color:#e2e8f0;display:flex;height:100vh}
+  .sidebar{width:220px;background:#0f1729;border-right:1px solid #1e293b;display:flex;flex-direction:column;padding:14px 10px;flex-shrink:0;overflow-y:auto}
+  .sidebar::-webkit-scrollbar{width:3px}
+  .sidebar::-webkit-scrollbar-thumb{background:#334155;border-radius:2px}
+  .sidebar .logo{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:0 4px;flex-shrink:0}
+  .sidebar .logo .icon{width:30px;height:30px;background:linear-gradient(135deg,#2563eb,#7c3aed);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}
+  .sidebar .logo h1{font-size:13px;font-weight:600;color:#f1f5f9}
+  .sidebar .logo .sub{font-size:10px;color:#64748b}
+  .sidebar .menu{flex:1;display:flex;flex-direction:column;gap:1px}
+  .sidebar .menu .label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#475569;margin:10px 0 3px 8px}
+  .sidebar .menu a{display:flex;align-items:center;gap:7px;padding:6px 8px;background:transparent;border:none;color:#94a3b8;font-size:12px;border-radius:5px;cursor:pointer;text-align:left;width:100%;transition:all .1s;text-decoration:none}
+  .sidebar .menu a:hover{background:#1e293b;color:#e2e8f0}
+  .sidebar .menu a.active{background:#1e293b;color:#fff}
+  .sidebar .menu a .ico{font-size:13px;width:18px;text-align:center;flex-shrink:0}
+  .sidebar .status{margin-top:auto;padding-top:10px;border-top:1px solid #1e293b;flex-shrink:0}
+  .sidebar .status .row{display:flex;align-items:center;gap:5px;font-size:10px;color:#64748b;padding:2px 0}
+  .sidebar .status .dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+  .sidebar .status .dot.green{background:#22c55e}
+  .sidebar .status .dot.red{background:#ef4444}
+  .sidebar .status .dot.yellow{background:#eab308}
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .toolbar{padding:8px 16px;background:#0f1729;border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:5px;flex-wrap:wrap;flex-shrink:0}
+  .toolbar .c{padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer;background:#1e293b;color:#94a3b8;border:1px solid transparent;transition:all .1s;white-space:nowrap;text-decoration:none}
+  .toolbar .c:hover{border-color:#334155;color:#e2e8f0}
+  .toolbar .c.prime{background:#1d4ed8;color:#fff}
+  .toolbar .c.prime:hover{background:#2563eb}
+  #panel{flex:1;overflow-y:auto;padding:8px 12px 4px;display:flex;flex-direction:column;gap:4px}
+  #panel::-webkit-scrollbar{width:5px}
+  #panel::-webkit-scrollbar-track{background:transparent}
+  #panel::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+  .search-bar{display:flex;gap:8px;margin-bottom:10px}
+  .search-bar input,.search-bar textarea,.search-bar select{flex:1;padding:8px 12px;border:1px solid #334155;border-radius:6px;background:#1e293b;color:#e2e8f0;font-size:13px;outline:none;font-family:inherit;resize:vertical}
+  .search-bar input:focus,.search-bar textarea:focus,.search-bar select:focus{border-color:#2563eb}
+  .search-bar button{padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;white-space:nowrap}
+  .search-bar button.sm{padding:8px 12px;font-size:11px}
+  .search-bar button:hover{background:#1d4ed8}
+  .search-bar button.green{background:#16a34a}
+  .search-bar button.green:hover{background:#15803d}
+  .search-bar button.amber{background:#d97706}
+  .search-bar button.amber:hover{background:#b45309}
+  .card{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px 14px;transition:all .1s}
+  .card.clickable{cursor:pointer}
+  .card.clickable:hover{border-color:#2563eb}
+  .card .title{font-size:13px;font-weight:500;color:#f1f5f9}
+  .card .meta{font-size:11px;color:#64748b;margin-top:3px;display:flex;gap:10px;flex-wrap:wrap}
+  .card .meta span{display:inline-flex;align-items:center;gap:3px}
+  .card .preview{font-size:12px;color:#94a3b8;margin-top:5px;line-height:1.5}
+  .card .val{font-size:13px;color:#e2e8f0;margin-top:2px}
+  .card .val.green{color:#4ade80}
+  .card .val.red{color:#f87171}
+  .card .val.amber{color:#facc15}
+  .card .val.mono{font-family:monospace;font-size:12px}
+  .msg{line-height:1.6;font-size:14px;white-space:pre-wrap;word-break:break-word}
+  .msg.user{align-self:flex-end;background:#2563eb;color:#fff;max-width:75%;padding:10px 14px;border-radius:10px}
+  .msg.bot{max-width:92%}
+  .msg .badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:4px;background:#374151;color:#94a3b8;margin:8px 0 4px;font-weight:500}
+  .msg .pass{color:#4ade80}
+  .msg .fail{color:#f87171}
+  .msg .warn{color:#facc15}
+  .msg .mono{font-family:monospace;font-size:12px;color:#94a3b8}
+  .chat-status{font-size:12px;color:#64748b;padding:4px 0;min-height:18px}
+  .chat-status:empty{padding:0}
+  .chat-content{line-height:1.5;font-size:13px;color:#cbd5e1}
+  .chat-tokens{font-size:14px;color:#e2e8f0;white-space:pre-wrap;word-break:break-word;margin:4px 0;border-right:2px solid #2563eb;animation:blink 0.8s step-end infinite}
+  @keyframes blink{50%{border-color:transparent}}
+  .chat-content .zw-result{max-height:300px;overflow-y:auto}
+  .chat-content .zw-result::-webkit-scrollbar{width:4px}
+  .chat-content .zw-result::-webkit-scrollbar-thumb{background:#334155;border-radius:2px}
+  .input-area{padding:8px 16px 12px;background:#0f1729;border-top:1px solid #1e293b;display:flex;gap:8px;align-items:flex-end;flex-shrink:0}
+  .input-area .iw{flex:1;display:flex;align-items:center;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:0 12px}
+  .input-area .iw:focus-within{border-color:#2563eb}
+  .input-area .iw textarea{flex:1;background:transparent;border:none;color:#e2e8f0;font-size:13px;padding:8px 0;outline:none;resize:none;font-family:inherit;line-height:1.5;max-height:80px}
+  .input-area button{padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:500}
+  .input-area button:disabled{opacity:.4;cursor:not-allowed}
+  .detect-box{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px}
+  .detect-box .badge{font-size:11px;padding:3px 10px;border-radius:5px;font-weight:500}
+  .detect-box .badge.grid{background:#166534;color:#86efac}
+  .detect-box .badge.external{background:#7c2d12;color:#fdba74}
+  .detect-box .badge.unknown{background:#374151;color:#9ca3af}
+  .prop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px}
+  .prop-item{background:#1e293b;border:1px solid #334155;border-radius:6px;padding:8px 12px}
+  .prop-item .rname{font-size:12px;color:#94a3b8}
+  .prop-item .rip{font-size:11px;color:#64748b}
+  .prop-item .rresult{font-size:13px;font-family:monospace;margin-top:3px}
+  .prop-item .rresult.green{color:#4ade80}
+  .prop-item .rresult.red{color:#f87171}
+  .section-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin:14px 0 6px 4px;font-weight:500}
+  .details-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
+  .details-grid .k{color:#64748b}
+  .details-grid .v{color:#e2e8f0}
+  .details-grid .v.green{color:#4ade80}
+  .details-grid .v.red{color:#f87171}
+  .details-grid .v.amber{color:#facc15}
+  .details-grid .v.mono{font-family:monospace;font-size:12px}
+  .flex-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .article-view{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:16px}
+  .article-view h2{font-size:16px;color:#f1f5f9;margin-bottom:4px}
+  .article-view .cat{font-size:11px;color:#64748b;margin-bottom:10px}
+  .article-view .body{font-size:13px;line-height:1.7;color:#cbd5e1;white-space:pre-wrap}
+  .article-view .back{font-size:12px;color:#2563eb;cursor:pointer;margin-bottom:8px;display:inline-block;text-decoration:none}
+  .article-view .back:hover{text-decoration:underline}
+  .welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;padding:40px 20px}
+  .welcome h2{font-size:18px;color:#f1f5f9;margin-bottom:6px}
+  .welcome p{font-size:13px;color:#64748b;max-width:440px;line-height:1.6}
+  .welcome .grid{margin-top:16px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  .welcome .grid .crd{padding:10px 16px;background:#1e293b;border-radius:8px;cursor:pointer;border:1px solid #334155;transition:all .1s;min-width:120px;text-decoration:none;color:inherit}
+  .welcome .grid .crd:hover{border-color:#2563eb}
+  .welcome .grid .crd .t{font-size:12px;color:#e2e8f0;font-weight:500}
+  .welcome .grid .crd .d{font-size:10px;color:#64748b;margin-top:1px}
+  .loading{color:#64748b;font-size:12px;padding:20px;text-align:center}
+  .empty{color:#475569;font-size:13px;padding:20px;text-align:center}
+  .hidden{display:none!important}
+  @keyframes b{0%,80%,100%{opacity:.3}40%{opacity:1}}
+  .htmx-indicator{opacity:0;transition:opacity .2s}
+  .htmx-request .htmx-indicator{opacity:1}
+  .htmx-request.htmx-indicator{opacity:1}
+  .wrap-text{white-space:pre-wrap;word-break:break-word;font-family:monospace;font-size:12px}
+  .conv-detail .msg-row{padding:8px 10px;margin-bottom:4px;border-radius:6px;font-size:13px;line-height:1.5}
+  .conv-detail .msg-row.user{background:#1e3a5f;border:1px solid #1e40af;margin-left:20px}
+  .conv-detail .msg-row.assistant,.conv-detail .msg-row.support{background:#1e293b;border:1px solid #334155;margin-right:20px}
+  .conv-detail .msg-row.system{background:#1a2e1a;border:1px solid #1e4a1e;font-size:11px;color:#94a3b8}
+  .conv-detail .msg-row .label{font-size:10px;color:#64748b;margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em}
+  .conv-detail .msg-row .content{white-space:pre-wrap;word-break:break-word}
+  .conv-detail .msg-row .meta{font-size:10px;color:#475569;margin-top:4px}
+  .conv-detail .msg-row .cmd{font-family:monospace;font-size:11px;color:#facc15;margin-top:4px;padding:4px 8px;background:#0f1729;border-radius:4px}
+  .back-btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#1e293b;border:1px solid #334155;border-radius:5px;color:#94a3b8;font-size:12px;cursor:pointer;margin-bottom:8px;transition:all .1s}
+  .back-btn:hover{border-color:#2563eb;color:#e2e8f0}
+  @media(max-width:720px){.sidebar{width:50px;padding:10px 5px}.sidebar .logo h1,.sidebar .logo .sub,.sidebar .menu .label,.sidebar .menu a span:not(.ico),.sidebar .status .row span:not(.dot){display:none}.sidebar .menu a{justify-content:center;padding:6px}}
 </style>
 </head>
-<body>
+<body hx-ext="response-targets">
 
 <div class="sidebar">
   <div class="logo">
     <div class="icon">1G</div>
     <div><h1>1-grid</h1><div class="sub">Support Agent</div></div>
   </div>
-
   <div class="menu">
     <div class="label">Main</div>
-    <button onclick="showView('chat')"><span class="ico">💬</span><span>Chat</span></button>
-    <button class="active" onclick="showView('dashboard')"><span class="ico">🏠</span><span>Dashboard</span></button>
-    <button onclick="showView('history')"><span class="ico">📋</span><span>History</span></button>
-    <button onclick="showView('kb')"><span class="ico">📚</span><span>Knowledge Base</span></button>
-    <button onclick="showView('tickets')"><span class="ico">🎫</span><span>Tickets</span></button>
+    <a href="#" hx-get="/views/dashboard" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar" class="active"><span class="ico">🏠</span><span>Dashboard</span></a>
+    <a href="#" hx-get="/views/chat" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar"><span class="ico">💬</span><span>Chat</span></a>
+    <a href="#" hx-get="/views/history" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar"><span class="ico">📋</span><span>History</span></a>
+    <a href="#" hx-get="/views/kb" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar"><span class="ico">📚</span><span>KB</span></a>
+    <a href="#" hx-get="/views/tickets" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar"><span class="ico">🎫</span><span>Tickets</span></a>
 
     <div class="label">Diagnose</div>
-    <button onclick="showView('zonewalk')"><span class="ico">🌐</span><span>Zonewalk</span></button>
-    <button onclick="showView('headers')"><span class="ico">📧</span><span>Mail Headers</span></button>
-    <button onclick="showView('propagation')"><span class="ico">📡</span><span>Propagation</span></button>
-    <button onclick="showView('nameservers')"><span class="ico">🔗</span><span>Nameservers</span></button>
-    <button onclick="showView('logs')"><span class="ico">📄</span><span>Log Analysis</span></button>
-
-    <div class="label">Tools</div>
-    <button onclick="showView('dns')"><span class="ico">🔎</span><span>DNS Lookup</span></button>
-    <button onclick="showView('whois')"><span class="ico">📇</span><span>WHOIS</span></button>
-    <button onclick="showView('ports')"><span class="ico">🔌</span><span>Port Scan</span></button>
-    <button onclick="showView('httpcheck')"><span class="ico">🌍</span><span>HTTP Check</span></button>
-    <button onclick="showView('subdomains')"><span class="ico">🗂️</span><span>Subdomains</span></button>
-    <button onclick="showView('blocklists')"><span class="ico">🛡️</span><span>Blocklists</span></button>
+    <a href="#" hx-get="/views/zonewalk" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar"><span class="ico">🌐</span><span>Zonewalk</span></a>
+    <a href="#" hx-get="/views/headers" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar"><span class="ico">📧</span><span>Mail Headers</span></a>
+    <a href="#" hx-get="/views/logs" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar"><span class="ico">📝</span><span>Log Analysis</span></a>
 
     <div class="label">Data</div>
-    <button onclick="showView('conversations')"><span class="ico">💬</span><span>Conversations</span></button>
-    <button onclick="showView('issues')"><span class="ico">🪲</span><span>Issues</span></button>
-    <button onclick="showView('patterns')"><span class="ico">🔍</span><span>Patterns</span></button>
-    <button onclick="showView('servers')"><span class="ico">🖥️</span><span>Servers</span></button>
-    <button onclick="showView('quickref')"><span class="ico">⚡</span><span>Quick Ref</span></button>
-    <button onclick="showView('status')"><span class="ico">📊</span><span>Status</span></button>
+    <a href="#" hx-get="/views/conversations" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar"><span class="ico">💬</span><span>Conversations</span></a>
+    <a href="#" hx-get="/views/issues" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar"><span class="ico">🪲</span><span>Issues</span></a>
+    <a href="#" hx-get="/views/patterns" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar"><span class="ico">🔍</span><span>Patterns</span></a>
+    <a href="#" hx-get="/views/servers" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar"><span class="ico">🖥️</span><span>Servers</span></a>
+    <a href="#" hx-get="/views/quickref" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar"><span class="ico">⚡</span><span>Quick Ref</span></a>
+    <a href="#" hx-get="/views/status" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loadbar"><span class="ico">📊</span><span>Status</span></a>
   </div>
 
   <div class="status">
@@ -256,1101 +174,281 @@
 </div>
 
 <div class="main">
-  <div class="toolbar" id="toolbar"></div>
+  <div class="toolbar" id="toolbar">
+    <div id="loadbar" class="htmx-indicator" style="font-size:11px;color:#64748b">Loading...</div>
+  </div>
   <div id="panel"></div>
-  <div class="input-area" id="inputArea">
+  <div class="input-area" id="inputArea" hidden>
     <div class="iw"><textarea id="input" rows="1" placeholder="Type a domain + issue, or /command..." enterkeyhint="send"></textarea></div>
-    <button id="sendBtn" onclick="sendMsg()">Send</button>
+    <button id="sendBtn" onclick="sendChat()">Send</button>
   </div>
 </div>
 
 <script>
-  const panel = document.getElementById('panel');
-  const input = document.getElementById('input');
-  const sendBtn = document.getElementById('sendBtn');
-  const toolbar = document.getElementById('toolbar');
-  const inputArea = document.getElementById('inputArea');
-  let loading = false;
-
-  input.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } });
-  input.addEventListener('input', () => { input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,80)+'px'; });
-
-  // ── NAVIGATION ──
-  function showView(name) {
-    document.querySelectorAll('.menu button').forEach(b => b.classList.remove('active'));
-    const btn = [...document.querySelectorAll('.menu button')].find(b => b.getAttribute('onclick')?.includes("'"+name+"'") || b.getAttribute('onclick')?.includes(`'${name}'`));
-    if (btn) btn.classList.add('active');
-    toolbar.innerHTML = '';
-    inputArea.style.display = 'none';
-    if (name === 'chat') { inputArea.style.display=''; showChat(); }
-    else { loadView(name); }
-  }
-
-  function loadView(name) {
-    const fn = views[name];
-    if (fn) fn();
-    else showEmpty('View not found: '+name);
-  }
-
-  // Sidebar button text matching for showView highlighting
-  const viewLabels = {
-    'chat':'chat','dashboard':'dashboard','history':'history','kb':'knowledge base',
-    'tickets':'tickets','zonewalk':'zonewalk','headers':'mail headers','propagation':'propagation',
-    'nameservers':'nameservers','logs':'log analysis','dns':'dns lookup','whois':'whois',
-    'ports':'port scan','httpcheck':'http check','subdomains':'subdomains','blocklists':'blocklists',
-    'conversations':'conversations','issues':'issues','patterns':'patterns',
-    'servers':'servers','quickref':'quick ref','status':'status'
-  };
-
-  // ── UTILITY ──
-  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-  function showLoading() { panel.innerHTML = '<div class="loading">Loading...</div>'; }
-  function showEmpty(t) { panel.innerHTML = `<div class="empty">${esc(t)}</div>`; }
-  function setToolbar(html) { toolbar.innerHTML = html; }
-
-  function copyText(t) {
-    navigator.clipboard.writeText(t).then(() => {
-      const el = document.createElement('div');
-      el.style.cssText = 'position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:#2563eb;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;z-index:999';
-      el.textContent = 'Copied!';
-      document.body.appendChild(el);
-      setTimeout(() => el.remove(), 1200);
-    });
-  }
-
-  // ── CHAT ──
-  let chatHistory = [];
-
-  function showChat() {
-    panel.innerHTML = '';
-    setToolbar(`
-      <span class="c prime" onclick="doChat('purify1.co.za WordPress 403')">🔍 purify1.co.za</span>
-      <span class="c prime" onclick="doChat('lond.co.za email not receiving')">📧 lond.co.za email</span>
-      <span class="c" onclick="doChat('/kb SPF record')">📚 KB SPF</span>
-      <span class="c" onclick="doChat('/history purify1')">📋 /history</span>
-      <span class="c" onclick="doChat('/status')">📊 /status</span>
-    `);
-    if (chatHistory.length === 0) {
-      panel.innerHTML = `\
-<div class="welcome">
-  <h2>1-grid Support Agent</h2>
-  <p>Diagnose hosting issues, search tickets, KB articles, and more. Type a domain + issue or use the sidebar panels.</p>
-  <div class="grid">
-    <div class="crd" onclick="doChat('purify1.co.za WordPress 403')"><div class="t">🔍 purify1.co.za</div><div class="d">WordPress 403</div></div>
-    <div class="crd" onclick="doChat('lond.co.za email not receiving')"><div class="t">📧 lond.co.za</div><div class="d">Email issue</div></div>
-    <div class="crd" onclick="doChat('/kb SPF record')"><div class="t">📚 KB SPF</div><div class="d">Search KB</div></div>
-    <div class="crd" onclick="doChat('/history purify1')"><div class="t">📋 /history</div><div class="d">Ticket history</div></div>
-  </div>
-</div>`;
-    } else {
-      for (const m of chatHistory) panel.appendChild(msgEl(m.role, m.text));
+  htmx.on('htmx:beforeRequest', function(evt) {
+    document.querySelectorAll('.menu a').forEach(a => a.classList.remove('active'));
+    var trigger = evt.detail.elt;
+    if (trigger && trigger.closest('.menu a')) trigger.closest('.menu a').classList.add('active');
+  });
+  htmx.on('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id === 'panel') {
+      var ta = document.getElementById('inputArea');
+      if (ta) ta.hidden = evt.detail.elt && evt.detail.elt.id !== 'chat-panel';
     }
-  }
-
-  function msgEl(role, text) {
-    const d = document.createElement('div');
-    d.className = 'msg ' + role;
-    if (role === 'user') { d.textContent = text; return d; }
-    const lines = text.split('\n');
-    let html = '';
-    for (let line of lines) {
-      const t = line.trim();
-      if (t.startsWith('===')) html += `<div class="badge">${esc(t.replace(/=/g,'').trim())}</div>`;
-      else if (/^(OK|FAIL|WARN|INFO)\s/.test(t) || /\s(OK|FAIL|WARN|INFO)\s/.test(t)) {
-        const cls = t.includes('FAIL') ? 'fail' : t.includes('WARN') ? 'warn' : 'pass';
-        html += `<div class="${cls}">${esc(t)}</div>`;
-      } else if (t.startsWith('  -') || t.startsWith('  #') || t.startsWith('    ')) {
-        html += `<div class="mono" style="padding-left:12px">${esc(t)}</div>`;
-      } else if (t) { html += `<div>${esc(t)}</div>`; }
-      else { html += '<div style="height:3px"></div>'; }
+  });
+  htmx.on('htmx:responseError', function(evt) {
+    var panel = document.getElementById('panel');
+    if (evt.detail.target.id === 'panel' && evt.detail.xhr.status !== 200) {
+      panel.innerHTML = '<div class="empty" style="padding:40px">⚠ Server error ('+evt.detail.xhr.status+'). Make sure the backend is running.</div>';
     }
-    d.innerHTML = html;
-    return d;
+  });
+  document.addEventListener('keydown', function(e) {
+    var input = document.getElementById('input');
+    if (!input) return;
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
+  // Chat session ID (persistent across page loads)
+  var chatSessionId = localStorage.getItem('chat_session');
+  if (!chatSessionId) {
+    chatSessionId = 'sess_' + Math.random().toString(36).substring(2,10) + Date.now().toString(36);
+    localStorage.setItem('chat_session', chatSessionId);
   }
 
-  function addMsg(role, text) {
-    chatHistory.push({role, text});
-    if (panel.querySelector('.welcome')) panel.innerHTML = '';
-    panel.appendChild(msgEl(role, text));
-    panel.scrollTop = panel.scrollHeight;
-  }
-
-  function typingOn() {
-    const d = document.createElement('div'); d.className = 'msg bot'; d.id = 'typing';
-    d.innerHTML = '<div style="display:flex;gap:4px;padding:4px 0"><span style="width:6px;height:6px;background:#94a3b8;border-radius:50%;animation:b 1.2s infinite"></span><span style="width:6px;height:6px;background:#94a3b8;border-radius:50%;animation:b 1.2s infinite;animation-delay:.2s"></span><span style="width:6px;height:6px;background:#94a3b8;border-radius:50%;animation:b 1.2s infinite;animation-delay:.4s"></span></div>';
-    panel.appendChild(d); panel.scrollTop = panel.scrollHeight;
-  }
-  function typingOff() { document.getElementById('typing')?.remove(); }
-
-  function doChat(text) { addMsg('user', text); callChat(text); }
-
-  function sendMsg() {
-    const text = input.value.trim(); if (!text) return;
-    input.value = ''; input.style.height = 'auto';
-    doChat(text);
-  }
-
-  async function callChat(msg) {
-    loading = true; sendBtn.disabled = true; typingOn();
-    try {
-      const r = await fetch('/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg}) });
-      typingOff();
-      if (!r.ok) { addMsg('bot', `Error: ${r.status}`); return; }
-      const d = await r.json();
-      addMsg('bot', d.response || '(empty)');
-    } catch(e) { typingOff(); addMsg('bot', 'Backend error: server unreachable.'); }
-    finally { loading = false; sendBtn.disabled = false; input.focus(); }
-  }
-
-  async function apiPost(url, body) {
-    const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-    if (!r.ok) throw new Error(`${url} returned ${r.status}`);
-    return r.json();
-  }
-
-  // ── DASHBOARD ──
-  views.dashboard = function() {
-    setToolbar(`<span class="c prime" onclick="showView('zonewalk')">🌐 Zonewalk</span><span class="c prime" onclick="showView('nameservers')">🔗 NS Check</span><span class="c prime" onclick="showView('propagation')">📡 Propagation</span><span class="c prime" onclick="showView('headers')">📧 Headers</span><span class="c prime" onclick="showView('logs')">📄 Logs</span>`);
-    panel.innerHTML = `
-<div class="welcome" style="padding:20px">
-  <h2 style="font-size:22px">1-grid Support Agent</h2>
-  <p style="margin-bottom:16px;max-width:500px">Diagnose hosting issues, check DNS, analyze mail headers, scan ports, search KB articles.</p>
-  <div class="grid" style="gap:8px">
-    <div class="crd" onclick="showView('zonewalk')"><div class="t">🌐 Zonewalk</div><div class="d">Full domain diagnosis</div></div>
-    <div class="crd" onclick="showView('nameservers')"><div class="t">🔗 Nameservers</div><div class="d">1-grid detection</div></div>
-    <div class="crd" onclick="showView('propagation')"><div class="t">📡 Propagation</div><div class="d">DNS propagation check</div></div>
-    <div class="crd" onclick="showView('headers')"><div class="t">📧 Mail Headers</div><div class="d">Parse email headers</div></div>
-    <div class="crd" onclick="showView('logs')"><div class="t">📄 Log Analysis</div><div class="d">Scan error logs</div></div>
-    <div class="crd" onclick="showView('kb')"><div class="t">📚 KB Articles</div><div class="d">Search knowledge base</div></div>
-    <div class="crd" onclick="showView('tickets')"><div class="t">🎫 Tickets</div><div class="d">Search ticket history</div></div>
-    <div class="crd" onclick="showView('dns')"><div class="t">🔎 DNS Lookup</div><div class="d">Dig records</div></div>
-    <div class="crd" onclick="showView('whois')"><div class="t">📇 WHOIS</div><div class="d">Domain registration</div></div>
-    <div class="crd" onclick="showView('ports')"><div class="t">🔌 Port Scan</div><div class="d">Scan open ports</div></div>
-    <div class="crd" onclick="showView('httpcheck')"><div class="t">🌍 HTTP Check</div><div class="d">HTTP + SSL check</div></div>
-    <div class="crd" onclick="showView('blocklists')"><div class="t">🛡️ Blocklists</div><div class="d">IP reputation check</div></div>
-    <div class="crd" onclick="showView('subdomains')"><div class="t">🗂️ Subdomains</div><div class="d">Enumerate subdomains</div></div>
-    <div class="crd" onclick="showView('conversations')"><div class="t">💬 Conversations</div><div class="d">Session history</div></div>
-    <div class="crd" onclick="showView('issues')"><div class="t">🪲 Issues</div><div class="d">All issue history</div></div>
-    <div class="crd" onclick="showView('quickref')"><div class="t">⚡ Quick Ref</div><div class="d">Commands reference</div></div>
-    <div class="crd" onclick="showView('status')"><div class="t">📊 Status</div><div class="d">System status</div></div>
-  </div>
-</div>`;
-  }
-
-  // ── VIEWS ──
-  const views = {};
-
-  // ── HISTORY ──
-  views.history = function() {
-    panel.innerHTML = `
-      <div class="search-bar"><input id="hq" placeholder="Search domain..." onkeydown="if(event.key==='Enter') searchHistory()"><button onclick="searchHistory()">Search</button></div>
-      <div id="hres"></div>`;
-    document.getElementById('hq').focus();
-    fetch('/tickets?limit=10').then(r=>r.json()).then(d => renderTicketList(d.tickets, 'hres')).catch(() => { const c=document.getElementById('hres'); if(c)c.innerHTML='<div class="empty">⚠ Failed to load tickets. Is the server running?</div>'; toast('Failed to load tickets','err'); });
-  }
-  window.searchHistory = function() {
-    const q = document.getElementById('hq').value.trim();
-    if (!q) return;
-    fetch('/tickets?q='+encodeURIComponent(q)+'&limit=20').then(r=>r.json()).then(d => renderTicketList(d.tickets, 'hres')).catch(() => toast('Search failed','err'));
-  }
-
-  // ── TICKETS ──
-  views.tickets = function() {
-    panel.innerHTML = `
-      <div class="search-bar"><input id="tq" placeholder="Search ticket ref, domain, or keyword..." onkeydown="if(event.key==='Enter') searchTickets()"><button onclick="searchTickets()">Search</button></div>
-      <div id="tres"></div>`;
-    document.getElementById('tq').focus();
-    fetch('/tickets?limit=15').then(r=>r.json()).then(d => renderTicketList(d.tickets, 'tres')).catch(() => { const c=document.getElementById('tres'); if(c)c.innerHTML='<div class="empty">⚠ Failed to load tickets. Is the server running?</div>'; toast('Failed to load tickets','err'); });
-  }
-  window.searchTickets = function() {
-    const q = document.getElementById('tq').value.trim();
-    fetch('/tickets?q='+encodeURIComponent(q)+'&limit=30').then(r=>r.json()).then(d => renderTicketList(d.tickets, 'tres')).catch(() => toast('Search failed','err'));
-  }
-
-  function renderTicketList(tickets, containerId) {
-    const c = document.getElementById(containerId);
-    if (!c) return;
-    if (!tickets || tickets.length === 0) { c.innerHTML = '<div class="empty">No tickets found</div>'; return; }
-    c.innerHTML = tickets.map(t => `
-      <div class="card clickable" onclick='showTicketDetail(${JSON.stringify(t).replace(/'/g,"&#39;")})'>
-        <div class="title">#${esc(t.ticket_ref||'?')} ${esc(t.domain)}</div>
-        <div class="meta">
-          <span>📅 ${esc(t.created_at||'')}</span>
-          <span>🏷️ ${esc(t.category||'')}${t.sub_category ? ' / '+esc(t.sub_category) : ''}</span>
-          <span>📌 ${esc(t.outcome||'')}</span>
-        </div>
-        <div class="preview">${esc((t.description||'').slice(0,200))}</div>
-      </div>
-    `).join('');
-  }
-
-  window.showTicketDetail = function(t) {
-    panel.innerHTML = `
-      <div class="article-view">
-        <span class="back" onclick="showView('tickets')">← Back to tickets</span>
-        <h2>#${esc(t.ticket_ref||'?')} ${esc(t.domain||'')}</h2>
-        <div class="cat">${esc(t.category||'')}${t.sub_category ? ' / '+esc(t.sub_category) : ''} · ${esc(t.outcome||'')} · ${esc(t.created_at||'')}</div>
-        <div class="cat">Server: ${esc(t.server_ip||'')} · PTR: ${esc(t.ptr||'')} · Channel: ${esc(t.channel||'')}</div>
-        <div class="body">${esc(t.description||'No description')}</div>
-        ${t.notes ? `<div class="body" style="margin-top:12px;color:#94a3b8">Notes: ${esc(t.notes)}</div>` : ''}
-      </div>`;
-  }
-
-  // ── KB ──
-  views.kb = function() {
-    panel.innerHTML = `
-      <div class="search-bar">
-        <input id="kbq" placeholder="Search KB articles... (e.g. SPF, DMARC, email, WordPress)" onkeydown="if(event.key==='Enter') searchKB()">
-        <button onclick="searchKB()">Search</button>
-        <button class="green sm" onclick="browseKB()">Browse All</button>
-      </div>
-      <div id="kbres"></div>
-      <div style="margin-top:6px;font-size:11px;color:#475569" id="kbcount"></div>`;
-    document.getElementById('kbq').focus();
-    fetch('/kb/search?q='+encodeURIComponent('email dns security domain')+'&n=30').then(r=>r.json()).then(d => {
-      if (d.articles && d.articles.length) {
-        document.getElementById('kbcount').textContent = d.articles.length + ' articles indexed';
-        renderKBResults(d.articles, document.getElementById('kbres'));
-      }
-    }).catch(() => { const c=document.getElementById('kbres'); if(c)c.innerHTML='<div class="empty">⚠ Failed to load KB articles</div>'; toast('KB search failed','err'); });
-  }
-  window.searchKB = function() {
-    const q = document.getElementById('kbq').value.trim();
-    if (!q) { document.getElementById('kbres').innerHTML = '<div class="empty">Type a search term to find articles</div>'; return; }
-    document.getElementById('kbres').innerHTML = '<div class="loading">Searching...</div>';
-    fetch('/kb/search?q='+encodeURIComponent(q)+'&n=15').then(r=>r.json()).then(d => {
-      renderKBResults(d.articles, document.getElementById('kbres'));
-    }).catch(() => { document.getElementById('kbres').innerHTML = '<div class="empty">⚠ Search failed</div>'; toast('KB search failed','err'); });
-  }
-  window.browseKB = function() {
-    document.getElementById('kbres').innerHTML = '<div class="loading">Loading...</div>';
-    fetch('/kb/search?q='+encodeURIComponent('email dns security domain hosting backup')+'&n=30').then(r=>r.json()).then(d => {
-      renderKBResults(d.articles, document.getElementById('kbres'));
-    }).catch(() => { document.getElementById('kbres').innerHTML = '<div class="empty">⚠ Failed to load</div>'; toast('Failed to load KB','err'); });
-  }
-  function renderKBResults(articles, container) {
-    if (!articles || articles.length === 0) { container.innerHTML = '<div class="empty">No articles found</div>'; return; }
-    container.innerHTML = articles.map(a => `
-      <div class="card clickable" onclick='showKBDetail(${JSON.stringify(a).replace(/'/g,"&#39;")})'>
-        <div class="title">${esc(a.title||'')}</div>
-        <div class="meta"><span>📂 ${esc(a.category||'General')}</span><span>📏 ${esc((a.distance||0).toFixed(3))}</span></div>
-        <div class="preview">${esc((a.content||'').slice(0,200))}</div>
-      </div>
-    `).join('');
-  }
-  window.showKBDetail = function(a) {
-    panel.innerHTML = `
-      <div class="article-view">
-        <span class="back" onclick="showView('kb')">← Back to KB search</span>
-        <h2>${esc(a.title||'')}</h2>
-        <div class="cat">📂 ${esc(a.category||'General')}</div>
-        <div class="body">${esc(a.content||'')}</div>
-      </div>`;
-  }
-
-  // ── PATTERNS ──
-  views.patterns = function() {
-    showLoading();
-    fetch('/tickets/by-server').then(r=>r.json()).then(d => {
-      if (!d.servers || d.servers.length === 0) { showEmpty('No patterns found'); return; }
-      let html = '<div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Tickets grouped by server IP — identify recurring issues</div>';
-      for (const s of d.servers) {
-        html += `<div class="card clickable" onclick='showServerTickets(${JSON.stringify(s).replace(/'/g,"&#39;")})' style="margin-bottom:6px">`;
-        html += `<div class="title">🖥️ ${esc(s.server_ip||'Unknown')} ${s.ptr ? '('+esc(s.ptr)+')' : ''}</div>`;
-        html += `<div class="meta"><span>📋 ${s.count} tickets</span><span>🏷️ ${esc(s.categories||'')}</span></div>`;
-        html += `<div class="meta"><span>🌐 ${esc(s.domains||'')}</span></div>`;
-        html += `<div class="meta"><span>📌 ${esc(s.sub_categories||'')}</span></div>`;
-        if (s.outcomes) html += `<div class="meta"><span>${esc(s.outcomes)}</span></div>`;
-        html += `</div>`;
-      }
-      panel.innerHTML = html;
-    }).catch(() => showEmpty('Failed to load patterns'));
-  }
-  window.showServerTickets = function(s) {
-    showLoading();
-    fetch('/tickets?q='+encodeURIComponent(s.server_ip)+'&limit=30').then(r=>r.json()).then(d => {
-      panel.innerHTML = `<div style="margin-bottom:6px"><span class="back" onclick="showView('patterns')" style="font-size:12px;color:#2563eb;cursor:pointer">← Back to patterns</span></div>`;
-      if (d.tickets) renderTicketList(d.tickets, 'panel');
-      else showEmpty('No tickets for this server');
-    });
-  }
-
-  // ── CONVERSATIONS ──
-  views.conversations = function() {
-    setToolbar(`<span class="c" onclick="document.getElementById('cvq').focus()">🔍 Filter</span><span class="c" onclick="loadConversations('')">⟳ Reload</span>`);
-    panel.innerHTML = `
-      <div class="search-bar">
-        <input id="cvq" placeholder="Search conversations..." onkeydown="if(event.key==='Enter') loadConversations(this.value)">
-        <button onclick="loadConversations(document.getElementById('cvq').value)">Search</button>
-      </div>
-      <div id="cvres"></div>`;
-    loadConversations('');
-  }
-  window.loadConversations = function(q) {
-    const c = document.getElementById('cvres');
-    if (!c) return;
-    c.innerHTML = '<div class="loading">Loading conversations...</div>';
-    fetch('/conversations?limit=50').then(r=>r.json()).then(d => {
-      let list = d.conversations || [];
-      if (q) {
-        const ql = q.toLowerCase();
-        list = list.filter(cv => JSON.stringify(cv).toLowerCase().includes(ql));
-      }
-      if (!list.length) { c.innerHTML = '<div class="empty">No conversations found</div>'; return; }
-      c.innerHTML = list.map(cv => {
-        const msgs = cv.messages || [];
-        const first = msgs[0]?.content?.slice(0,120) || '(empty)';
-        const last = msgs[msgs.length-1]?.content?.slice(0,200) || '';
-        const cmds = cv.commands?.length || 0;
-        return `<div class="card clickable" onclick='showConvDetail(${JSON.stringify(cv).replace(/'/g,"&#39;")})'>
-          <div class="title">💬 ${esc(cv.source||'unknown')} · ${esc(cv.id||'').slice(0,24)}</div>
-          <div class="meta"><span>📅 ${esc(cv.timestamp||'')}</span><span>💬 ${msgs.length} messages</span><span>⚡ ${cmds} commands</span></div>
-          <div class="preview">${esc(first)}</div>
-        </div>`;
-      }).join('');
-    }).catch(() => c.innerHTML = '<div class="empty">Failed to load conversations</div>');
-  }
-  window.showConvDetail = function(cv) {
-    const msgs = cv.messages || [];
-    const cmds = cv.commands || [];
-    panel.innerHTML = `<div class="article-view">
-      <span class="back" onclick="showView('conversations')">← Back to conversations</span>
-      <h2>💬 ${esc(cv.source||'Session')}</h2>
-      <div class="cat">${esc(cv.id||'')} · ${esc(cv.timestamp||'')} · ${msgs.length} messages</div>
-      ${msgs.map((m,i) => `<div class="card" style="margin-bottom:4px;${m.role==='user'?'border-color:#2563eb':''}">
-        <div class="meta">${m.role==='user' ? '👤 User' : '🤖 Assistant'}</div>
-        <div class="body" style="font-size:12px;margin-top:2px">${esc(m.content||'').slice(0,1000)}</div>
-      </div>`).join('')}
-      ${cmds.length ? `<div class="section-label">Commands (${cmds.length})</div>
-        ${cmds.map(c => `<div class="card" style="padding:5px 10px;margin-bottom:2px"><div class="val mono" style="font-size:11px">${esc(c.command||'')}</div><div class="preview" style="font-size:10px">${esc((c.output||'').slice(0,200))}</div></div>`).join('')}` : ''}
-    </div>`;
-  }
-
-  // ── ISSUES ──
-  views.issues = function() {
-    setToolbar(`<span class="c" onclick="document.getElementById('isq').focus()">🔍 Filter</span>`);
-    panel.innerHTML = `
-      <div class="search-bar">
-        <input id="isq" placeholder="Search issues by domain, ticket ref, or keyword..." onkeydown="if(event.key==='Enter') loadIssues(document.getElementById('isq').value)">
-        <button onclick="loadIssues(document.getElementById('isq').value)">Search</button>
-      </div>
-      <div id="isres"></div>`;
-    loadIssues('');
-  }
-  window.loadIssues = function(q) {
-    const c = document.getElementById('isres');
-    if (!c) return;
-    c.innerHTML = '<div class="loading">Loading issues...</div>';
-    const url = q ? '/issues?q='+encodeURIComponent(q)+'&limit=20' : '/issues?limit=20';
-    fetch(url).then(r=>r.json()).then(d => {
-      if (!d.issues || !d.issues.length) { c.innerHTML = '<div class="empty">No issues found</div>'; return; }
-      c.innerHTML = d.issues.map(iss => `
-        <div class="card clickable" onclick='showIssueDetail(${JSON.stringify(iss).replace(/'/g,"&#39;")})'>
-          <div class="title">${esc(iss.domain||'')} <span style="font-weight:400;font-size:11px;color:#64748b">#${esc(iss.ticket_ref||'?')}</span></div>
-          <div class="meta">
-            <span>📅 ${esc(iss.created_at||'')}</span>
-            <span>🏷️ ${esc(iss.issue_type||'')}</span>
-            <span>📌 <span class="${iss.status==='resolved'?'green':'red'}">${esc(iss.status||'')}</span></span>
-          </div>
-          <div class="preview">${esc((iss.issue_summary||'').slice(0,200))}</div>
-        </div>
-      `).join('');
-    }).catch(() => c.innerHTML = '<div class="empty">Failed to load issues</div>');
-  }
-  window.showIssueDetail = function(iss) {
-    panel.innerHTML = `<div class="article-view">
-      <span class="back" onclick="showView('issues')">← Back to issues</span>
-      <h2>${esc(iss.domain||'')} <span style="font-weight:400;font-size:14px;color:#64748b">#${esc(iss.ticket_ref||'?')}</span></h2>
-      <div class="cat">${esc(iss.issue_type||'')} · ${esc(iss.hosting_type||'')} · <span class="${iss.status==='resolved'?'green':'red'}">${esc(iss.status||'')}</span></div>
-      <div class="details-grid" style="margin-bottom:10px">
-        <span class="k">Server</span><span class="v mono">${esc(iss.server_ip||'')}</span>
-        ${iss.ptr ? `<span class="k">PTR</span><span class="v mono">${esc(iss.ptr)}</span>` : ''}
-        ${iss.nameservers ? `<span class="k">NS</span><span class="v mono">${esc(iss.nameservers)}</span>` : ''}
-        <span class="k">Ticket</span><span class="v">${esc(iss.ticket_ref||'')}</span>
-        <span class="k">Source</span><span class="v">${esc(iss.source||'')}</span>
-      </div>
-      <div class="section-label">Summary</div>
-      <div class="body">${esc(iss.issue_summary||'No summary')}</div>
-      ${iss.resolution ? `<div class="section-label" style="margin-top:10px">Resolution</div><div class="body" style="color:#86efac">${esc(iss.resolution)}</div>` : ''}
-    </div>`;
-  }
-
-  // ── SERVERS ──
-  views.servers = function() {
-    setToolbar(`<span class="c" onclick="document.getElementById('svq').focus()">🔍 Filter</span>`);
-    panel.innerHTML = `
-      <div style="font-size:12px;color:#94a3b8;margin-bottom:6px">All server IPs from tickets with ticket counts and known issues</div>
-      <div class="search-bar">
-        <input id="svq" placeholder="Filter by IP, hostname, domain..." onkeydown="if(event.key==='Enter') loadServers(document.getElementById('svq').value)">
-        <button onclick="loadServers(document.getElementById('svq').value)">Filter</button>
-      </div>
-      <div id="svres"></div>`;
-    loadServers('');
-  }
-  window.loadServers = function(q) {
-    const c = document.getElementById('svres');
-    if (!c) return;
-    c.innerHTML = '<div class="loading">Loading servers...</div>';
-    fetch('/servers/enriched').then(r=>r.json()).then(d => {
-      let list = d.servers || [];
-      if (q) {
-        const ql = q.toLowerCase();
-        list = list.filter(s => JSON.stringify(s).toLowerCase().includes(ql));
-      }
-      if (!list.length) { c.innerHTML = '<div class="empty">No servers found</div>'; return; }
-      c.innerHTML = list.map(s => `
-        <div class="card" style="margin-bottom:4px">
-          <div class="title">🖥️ ${esc(s.server_ip||'')} ${s.ptr ? '('+esc(s.ptr)+')' : ''}</div>
-          <div class="meta">
-            <span>${s.hostname ? esc(s.hostname) : ''}</span>
-            <span>📋 ${s.ticket_count||0} tickets</span>
-            ${s.hosting_type ? `<span>${esc(s.hosting_type)}</span>` : ''}
-          </div>
-          ${s.domains ? `<div class="preview">🌐 ${esc(s.domains)}</div>` : ''}
-          ${s.categories ? `<div class="preview">🏷️ ${esc(s.categories)}</div>` : ''}
-          ${s.outcomes ? `<div class="preview">📌 ${esc(s.outcomes)}</div>` : ''}
-          ${s.known_issues ? `<div class="preview" style="color:#f87171">⚠️ ${esc(s.known_issues)}</div>` : ''}
-        </div>
-      `).join('');
-    }).catch(() => c.innerHTML = '<div class="empty">Failed to load servers</div>');
-  }
-
-  // ── QUICK REF ──
-  views.quickref = function() {
-    showLoading();
-    setToolbar(`<span class="c" onclick="document.getElementById('qrf').focus()">🔍 Filter</span>`);
-    fetch('/quickref/by-category').then(r=>r.json()).then(d => {
-      const cats = d.categories || {};
-      const keys = Object.keys(cats);
-      if (keys.length === 0) { showEmpty('No quick references'); return; }
-      let html = '<input id="qrf" style="width:100%;padding:8px 12px;border:1px solid #334155;border-radius:6px;background:#1e293b;color:#e2e8f0;font-size:13px;outline:none;margin-bottom:8px" placeholder="Filter references..." oninput="filterQuickRef(this.value)">';
-      html += '<div id="qrlist">';
-      for (const cat of keys) {
-        html += `<div class="qr-cat" data-cat="${esc(cat)}"><div style="font-size:11px;color:#94a3b8;font-weight:500;margin:8px 0 3px 4px">${esc(cat)}</div>`;
-        for (const r of cats[cat]) {
-          html += `<div class="card clickable qr-item" style="margin-bottom:3px" data-search="${esc((r.key_name+' '+cat+' '+r.value).toLowerCase())}" onclick='copyText(${JSON.stringify(r.value).replace(/'/g,"&#39;")})'>`;
-          html += `<div class="title">${esc(r.key_name||'')}</div>`;
-          html += `<div class="preview" style="font-family:monospace;font-size:11px;color:#a5b4fc">${esc(r.value||'')}</div>`;
-          html += `</div>`;
-        }
-        html += `</div>`;
-      }
-      html += '</div>';
-      panel.innerHTML = html;
-    }).catch(() => showEmpty('Failed to load'));
-  }
-  window.filterQuickRef = function(val) {
-    const q = val.toLowerCase();
-    document.querySelectorAll('.qr-item').forEach(el => {
-      el.style.display = el.dataset.search.includes(q) ? '' : 'none';
-    });
-    document.querySelectorAll('.qr-cat').forEach(el => {
-      const visible = [...el.querySelectorAll('.qr-item')].some(e => e.style.display !== 'none');
-      el.style.display = visible ? '' : 'none';
-    });
-  }
-
-  // ── STATUS ──
-  views.status = function() {
-    showLoading();
-    Promise.all([
-      fetch('/health').then(r=>r.json()),
-      fetch('/health/ollama').then(r=>r.json()),
-      fetch('/tickets?limit=1').then(r=>r.json()),
-    ]).then(([h, o, t]) => {
-      let ticketCount = '?';
-      if (t && t.tickets) ticketCount = t.tickets.length+'+';
-      panel.innerHTML = `
-        <div class="card"><div class="title">📊 System Status</div></div>
-        <div class="card" style="margin-top:4px">
-          <div class="title">Server</div>
-          <div class="meta"><span>Status: ${esc(h.status||'unknown')}</span><span>Model: ${esc(h.model||'N/A')}</span></div>
-        </div>
-        <div class="card" style="margin-top:4px">
-          <div class="title">Ollama</div>
-          <div class="meta"><span>Status: ${esc(o.status||'disconnected')}</span><span>Model: ${esc(o.model||'none')}</span></div>
-        </div>
-        <div class="card" style="margin-top:4px">
-          <div class="title">Database</div>
-          <div class="meta"><span>Type: TinyDB (NoSQL)</span><span>Tickets: ${ticketCount}</span></div>
-        </div>
-        <div class="card" style="margin-top:4px">
-          <div class="title">Zonewalk</div>
-          <div class="meta"><span>Mode: Python native</span><span>DNS: dnspython</span></div>
-        </div>
-        <div class="card" style="margin-top:4px">
-          <div class="title">Endpoints Available</div>
-          <div class="meta"><span>18+ tool/data endpoints</span><span>Chat + Commands</span></div>
-        </div>`;
-    }).catch(() => showEmpty('Could not load status'));
-  }
-
-  // ══════════════════════════════════════════════════════════════════
-  // NEW TOOLS
-  // ══════════════════════════════════════════════════════════════════
-
-  // ── ZONEWALK ──
-  views.zonewalk = function() {
-    setToolbar(`
-      <span class="c" onclick="document.getElementById('zwd').focus()">🔍 Enter domain</span>
-      <span class="c" onclick="runZonewalk(true)">🔧 Deep + Ports</span>
-    `);
-    panel.innerHTML = `
-      <div class="search-bar">
-        <input id="zwd" placeholder="Domain to diagnose (e.g. purify1.co.za)" onkeydown="if(event.key==='Enter') runZonewalk(false)">
-        <button onclick="runZonewalk(false)">Zonewalk</button>
-        <button class="amber" onclick="runZonewalk(true)">Deep Scan</button>
-      </div>
-      <div id="zwres"></div>`;
-    document.getElementById('zwd').focus();
-  }
-
-  window.runZonewalk = async function(deep) {
-    const domain = document.getElementById('zwd').value.trim();
-    if (!domain) return;
-    const c = document.getElementById('zwres');
-    c.innerHTML = '<div class="loading">Running zonewalk...</div>';
-    try {
-      const d = await apiPost('/zonewalk/check', { domain, deep, ports: deep, reputation: deep });
-      let html = '';
-
-      // Provider badge
-      html += `<div class="detect-box" style="margin-bottom:8px">`;
-      html += `<span class="badge ${d.is_grid ? 'grid' : d.hosting_provider !== 'Unknown / External' ? 'external' : 'unknown'}">${d.is_grid ? '1-grid' : d.hosting_provider}</span>`;
-      html += `<span style="font-size:13px">${esc(d.domain)}</span>`;
-      if (d.hosting_type) html += `<span style="font-size:11px;color:#64748b">${esc(d.hosting_type)}</span>`;
-      html += `</div>`;
-
-      // NS
-      if (d.nameservers && d.nameservers.length) {
-        html += '<div class="section-label">Nameservers</div>';
-        d.nameservers.forEach(ns => { html += `<div class="card" style="padding:6px 10px;margin-bottom:2px"><div class="val mono">${esc(ns)}</div></div>`; });
-      }
-
-      // A + PTR
-      html += '<div class="section-label">DNS Records</div>';
-      html += '<div class="details-grid" style="margin-bottom:6px">';
-      html += `<span class="k">A Record</span><span class="v mono">${d.a_records && d.a_records.length ? esc(d.a_records.join(', ')) : 'NONE'}</span>`;
-      html += `<span class="k">PTR</span><span class="v mono ${d.ptr_record ? '' : 'red'}">${d.ptr_record ? esc(d.ptr_record) : 'No PTR'}</span>`;
-      if (d.ptr_record && d.domain && !d.ptr_record.includes(d.domain)) {
-        html += `<span class="k"></span><span class="v red">⚠ PTR mismatch</span>`;
-      }
-      if (d.mx_records && d.mx_records.length) {
-        html += `<span class="k">MX</span><span class="v mono">${esc(d.mx_records.map(m=>m[1]).join(', '))}</span>`;
-      }
-      if (d.soa) {
-        html += `<span class="k">SOA</span><span class="v mono">${esc(d.soa.mname||'')} · serial ${d.soa.serial||'?'}</span>`;
-      }
-      html += '</div>';
-
-      // Mail auth
-      html += '<div class="section-label">Mail Authentication</div>';
-      html += '<div class="details-grid" style="margin-bottom:6px">';
-      const spfSt = d.spf_record ? 'OK' : 'MISSING';
-      const dkSt = d.dkim_records && d.dkim_records.length ? 'OK' : 'MISSING';
-      const dmSt = d.dmarc_record ? 'OK' : 'MISSING';
-      html += `<span class="k">SPF</span><span class="v ${spfSt==='OK'?'green':'red'}">${spfSt}</span>`;
-      html += `<span class="k">DKIM</span><span class="v ${dkSt==='OK'?'green':'red'}">${dkSt}</span>`;
-      html += `<span class="k">DMARC</span><span class="v ${dmSt==='OK'?'green':'red'}">${dmSt}</span>`;
-      if (d.has_mailchannels) html += `<span class="k">MailChannels</span><span class="v green">Authorised</span>`;
-      html += '</div>';
-
-      // HTTP + SSL
-      if (d.http_status || d.https_status) {
-        html += '<div class="section-label">Web / SSL</div>';
-        html += '<div class="details-grid" style="margin-bottom:6px">';
-        if (d.http_status) html += `<span class="k">HTTP</span><span class="v">${d.http_status.status_code}</span>`;
-        if (d.https_status) html += `<span class="k">HTTPS</span><span class="v">${d.https_status.status_code}</span>`;
-        if (d.ssl_expiry_days !== null && d.ssl_expiry_days !== undefined) {
-          const cls = d.ssl_expiry_days < 14 ? 'red' : d.ssl_expiry_days < 60 ? 'amber' : 'green';
-          html += `<span class="k">SSL</span><span class="v ${cls}">${d.ssl_expiry_days} days</span>`;
-        }
-        html += '</div>';
-      }
-
-      // Open ports
-      if (d.open_ports && d.open_ports.length) {
-        html += '<div class="section-label">Open Ports</div>';
-        html += '<div class="flex-row" style="margin-bottom:6px">';
-        d.open_ports.forEach(p => {
-          html += `<span class="c" style="background:#1e293b;border:1px solid #334155;padding:2px 8px;border-radius:4px;font-size:11px">${p[1]} (${p[0]})</span>`;
-        });
-        html += '</div>';
-      }
-
-      // Propagation
-      if (d.propagation && d.propagation.length) {
-        html += '<div class="section-label">DNS Propagation</div>';
-        html += '<div class="prop-grid" style="margin-bottom:6px">';
-        d.propagation.forEach(p => {
-          const cls = p.match ? 'green' : 'red';
-          html += `<div class="prop-item"><div class="rname">${esc(p.resolver)}</div><div class="rip">${p.ip}</div><div class="rresult ${cls}">${p.result && p.result.length ? esc(p.result.join(', ')) : 'NONE'} ${p.match ? '✓' : '✗'}</div></div>`;
-        });
-        html += '</div>';
-      }
-
-      // Blocklists
-      if (d.blocklists && d.blocklists.length) {
-        html += '<div class="section-label">IP Reputation</div>';
-        html += '<div class="flex-row" style="margin-bottom:6px">';
-        d.blocklists.forEach(b => {
-          const cls = b.listed ? 'red' : 'green';
-          html += `<span class="c" style="background:#1e293b;border:1px solid #334155;padding:2px 8px;border-radius:4px;font-size:11px;color:${cls==='red'?'#f87171':'#4ade80'}">${b.list}: ${b.listed ? 'LISTED' : 'Clean'}</span>`;
-        });
-        html += '</div>';
-      }
-
-      // Subdomains
-      if (d.subdomains && d.subdomains.length) {
-        html += '<div class="section-label">Subdomains Found</div>';
-        html += d.subdomains.map(sd => {
-          const info = sd.ips ? sd.ips.join(', ') : sd.cname ? 'CNAME '+sd.cname : '';
-          return `<div class="card" style="padding:5px 10px;margin-bottom:2px"><div class="val mono">${esc(sd.subdomain)} → ${esc(info)}</div></div>`;
-        }).join('');
-      }
-
-      // Issues
-      if (d.issues && d.issues.length) {
-        html += '<div class="section-label" style="margin-top:8px">Issues Found</div>';
-        d.issues.forEach(iss => {
-          const cls = iss.startsWith('NO_') || iss.startsWith('HTTP_5') || iss.startsWith('SSL_EXP') ? 'red' : iss.startsWith('PTR_') || iss.startsWith('DMARC_') ? 'amber' : 'amber';
-          html += `<div style="padding:3px 0;font-size:12px;color:${cls==='red'?'#f87171':cls==='amber'?'#facc15':'#94a3b8'}">⚠ ${esc(iss)}</div>`;
-        });
-      }
-
-      // WHOIS
-      if (d.whois && d.whois.registrar) {
-        html += '<div class="section-label" style="margin-top:8px">WHOIS</div>';
-        html += '<div class="details-grid">';
-        html += `<span class="k">Registrar</span><span class="v">${esc(d.whois.registrar)}</span>`;
-        if (d.whois.expiry) html += `<span class="k">Expiry</span><span class="v">${esc(d.whois.expiry)}</span>`;
-        html += '</div>';
-      }
-
-      c.innerHTML = html;
-    } catch(e) { c.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; }
-  }
-
-  // ── MAIL HEADERS ──
-  views.headers = function() {
-    setToolbar(`<span class="c" onclick="document.getElementById('mh').focus()">📋 Paste headers</span><span class="c" onclick="document.getElementById('mh').value='';document.getElementById('mhres').innerHTML=''">🗑️ Clear</span>`);
-    panel.innerHTML = `
-      <div style="display:flex;flex-direction:column;gap:8px;height:100%">
-        <div style="font-size:12px;color:#94a3b8">Paste raw email headers below. The tool parses SPF, DKIM, DMARC, Received chain, and block reasons.</div>
-        <textarea id="mh" placeholder="Paste email headers here...
-Return-Path: <bounce@example.com>
-Received: from mail.example.com (1.2.3.4)
-Authentication-Results: spf=pass; dkim=pass; dmarc=pass
-..." style="min-height:140px;padding:10px;border:1px solid #334155;border-radius:6px;background:#1e293b;color:#e2e8f0;font-size:12px;font-family:monospace;outline:none;resize:vertical"></textarea>
-        <div><button onclick="analyzeHeaders()" style="padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500">Analyze Headers</button></div>
-        <div id="mhres"></div>
-      </div>`;
-  }
-
-  window.analyzeHeaders = async function() {
-    const text = document.getElementById('mh').value.trim();
+  function sendChat() {
+    var input = document.getElementById('input');
+    if (!input) return;
+    var text = input.value.trim();
     if (!text) return;
-    const c = document.getElementById('mhres');
-    c.innerHTML = '<div class="loading">Analyzing...</div>';
-    try {
-      const d = await apiPost('/mail/headers', { headers: text });
+    input.value = '';
+    var msgs = document.getElementById('chat-messages');
+    var sendBtn = document.getElementById('sendBtn');
+    if (!msgs) return;
 
-      if (d.block_reason) {
-        c.innerHTML = `<div class="card" style="border-color:#ef4444;margin-bottom:8px"><div class="title" style="color:#f87171">⛔ Block Detected</div><div class="val" style="color:#fca5a5">${esc(d.block_reason)}</div></div>`;
+    // Disable input during processing
+    input.disabled = true;
+    sendBtn.disabled = true;
+    sendBtn.textContent = '...';
+
+    // Append user message
+    var userEl = document.createElement('div');
+    userEl.className = 'msg user';
+    userEl.textContent = text;
+    msgs.appendChild(userEl);
+    msgs.scrollTop = msgs.scrollHeight;
+
+    // Create bot message container
+    var botEl = document.createElement('div');
+    botEl.className = 'msg bot';
+    msgs.appendChild(botEl);
+    msgs.scrollTop = msgs.scrollHeight;
+
+    // Status bar
+    var statusEl = document.createElement('div');
+    statusEl.className = 'chat-status';
+    botEl.appendChild(statusEl);
+
+    // Content area
+    var contentEl = document.createElement('div');
+    contentEl.className = 'chat-content';
+    botEl.appendChild(contentEl);
+
+    // Streaming state
+    var currentTokenDiv = null;
+    var fullText = '';
+    var hasTokens = false;
+
+    // Start streaming fetch
+    fetch('/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'message=' + encodeURIComponent(text) + '&session_id=' + encodeURIComponent(chatSessionId)
+    }).then(function(resp) {
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+
+      function readStream() {
+        reader.read().then(function(result) {
+          if (result.done) {
+            finish();
+            return;
+          }
+          buffer += decoder.decode(result.value, {stream: true});
+          var lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line) continue;
+            if (line.startsWith('event: ')) {
+              var eventType = line.substring(7).trim();
+              // Read next line for data
+              if (i + 1 < lines.length) {
+                var dataLine = lines[i + 1].trim();
+                if (dataLine.startsWith('data: ')) {
+                  processEvent(eventType, dataLine.substring(6).trim());
+                  i++; // skip next line
+                }
+              } else {
+                // data might be in next chunk
+                buffer = line + '\n' + buffer;
+              }
+            } else if (line.startsWith('data: ')) {
+              processEvent('message', line.substring(6).trim());
+            }
+          }
+          readStream();
+        }).catch(function(err) {
+          statusEl.innerHTML = '<span style="color:#f87171;font-size:11px">⚠ Stream error: ' + err.message + '</span>';
+          finish();
+        });
       }
 
-      let html = '<div class="section-label">Header Fields</div><div class="details-grid" style="margin-bottom:8px">';
-      const fields = [
-        ['From', d.from], ['To', d.to], ['Subject', d.subject],
-        ['Date', d.date], ['Return-Path', d.return_path], ['Reply-To', d.reply_to],
-        ['Originating IP', d.originating_ip], ['Spam Score', d.spam_score],
-      ];
-      fields.forEach(([k,v]) => { if (v) html += `<span class="k">${k}</span><span class="v mono">${esc(v)}</span>`; });
-      html += '</div>';
+      function processEvent(eventType, raw) {
+        try {
+          var data = JSON.parse(raw);
+        } catch(e) { return; }
 
-      html += '<div class="section-label">Authentication</div><div class="details-grid" style="margin-bottom:8px">';
-      const auths = [
-        ['SPF', d.spf_result], ['DKIM', d.dkim_result], ['DMARC', d.dmarc_result], ['ARC', d.arc_result],
-      ];
-      auths.forEach(([k,v]) => {
-        if (v) {
-          const cls = v === 'pass' ? 'green' : 'red';
-          html += `<span class="k">${k}</span><span class="v ${cls}">${esc(v)}</span>`;
+        if (eventType === 'status') {
+          statusEl.innerHTML = '<span style="color:#94a3b8;font-size:11px">' + (data.text || '') + '</span>';
+          msgs.scrollTop = msgs.scrollHeight;
+        } else if (eventType === 'html') {
+          // Append HTML content directly
+          var div = document.createElement('div');
+          div.innerHTML = data.html || '';
+          contentEl.appendChild(div);
+          msgs.scrollTop = msgs.scrollHeight;
+        } else if (eventType === 'token') {
+          hasTokens = true;
+          var aiTarget = document.getElementById('ai-tokens');
+          if (aiTarget) {
+            var txt = data.text || '';
+            fullText += txt;
+            aiTarget.textContent = fullText;
+          } else {
+            if (!currentTokenDiv) {
+              currentTokenDiv = document.createElement('div');
+              currentTokenDiv.className = 'chat-tokens';
+              contentEl.appendChild(currentTokenDiv);
+            }
+            var txt = data.text || '';
+            fullText += txt;
+            currentTokenDiv.textContent = fullText;
+          }
+          msgs.scrollTop = msgs.scrollHeight;
+        } else if (eventType === 'replace_last') {
+          statusEl.innerHTML = '';
+          var aiContainer = document.getElementById('ai-analysis');
+          if (aiContainer) {
+            aiContainer.innerHTML = data.html || '';
+          } else if (currentTokenDiv && currentTokenDiv.parentNode) {
+            currentTokenDiv.parentNode.removeChild(currentTokenDiv);
+            currentTokenDiv = null;
+            var div = document.createElement('div');
+            div.innerHTML = data.html || '';
+            contentEl.appendChild(div);
+          } else {
+            var div = document.createElement('div');
+            div.innerHTML = data.html || '';
+            contentEl.appendChild(div);
+          }
+          msgs.scrollTop = msgs.scrollHeight;
+        } else if (eventType === 'done') {
+          statusEl.innerHTML = '';
+          finish();
+        } else if (eventType === 'error') {
+          var errDiv = document.createElement('div');
+          errDiv.style.cssText = 'color:#f87171;font-size:12px;padding:6px 0';
+          errDiv.textContent = data.text || 'Unknown error';
+          contentEl.appendChild(errDiv);
+          finish();
         }
-      });
-      html += '</div>';
-
-      if (d.hops && d.hops.length) {
-        html += '<div class="section-label">Received Chain ('+d.hops.length+' hops)</div>';
-        d.hops.forEach((h, i) => {
-          const label = i === 0 ? 'Origin' : i === d.hops.length-1 ? 'Final' : `Hop ${i+1}`;
-          html += `<div class="card" style="padding:6px 10px;margin-bottom:2px"><div style="font-size:10px;color:#64748b;margin-bottom:2px">${label}</div><div class="val mono" style="font-size:11px">${esc(h.substr(0,200))}</div></div>`;
-        });
       }
 
-      c.innerHTML = html;
-    } catch(e) { c.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; }
-  }
-
-  // ── PROPAGATION ──
-  views.propagation = function() {
-    setToolbar(`<span class="c" onclick="document.getElementById('ppd').focus()">📡 Enter domain</span>`);
-    panel.innerHTML = `
-      <div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Check DNS propagation across global resolvers (Google, Cloudflare, OpenDNS, ZA ISPs)</div>
-      <div class="search-bar">
-        <input id="ppd" placeholder="Domain (e.g. example.co.za)" onkeydown="if(event.key==='Enter') checkPropagation()">
-        <button onclick="checkPropagation()">Check Propagation</button>
-      </div>
-      <div id="ppres"></div>`;
-    document.getElementById('ppd').focus();
-  }
-  window.checkPropagation = async function() {
-    const domain = document.getElementById('ppd').value.trim();
-    if (!domain) return;
-    const c = document.getElementById('ppres');
-    c.innerHTML = '<div class="loading">Checking propagation...</div>';
-    try {
-      const d = await apiPost('/propagation', { domain });
-      let html = `<div class="card" style="margin-bottom:8px"><div class="title">📡 ${esc(d.domain)}</div><div class="meta">A records: ${d.a_records ? esc(d.a_records.join(', ')) : 'NONE'}</div></div>`;
-      if (d.propagation && d.propagation.length) {
-        html += '<div class="prop-grid">';
-        d.propagation.forEach(p => {
-          const match = p.match;
-          const cls = match ? 'green' : 'red';
-          const icon = match ? '✓' : '✗';
-          html += `<div class="prop-item">
-            <div class="rname">${esc(p.resolver)} ${icon}</div>
-            <div class="rip">${p.ip}</div>
-            <div class="rresult ${cls}">${p.result && p.result.length ? esc(p.result.join(', ')) : 'NONE'}</div>
-            ${!match ? `<div style="font-size:10px;color:#64748b">Expected: ${esc(d.a_records ? d.a_records.join(', ') : '')}</div>` : ''}
-          </div>`;
-        });
-        html += '</div>';
-      } else {
-        html += '<div class="empty">No propagation data (no A records)</div>';
+      function finish() {
+        statusEl.innerHTML = '';
+        input.disabled = false;
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send';
+        input.focus();
       }
-      c.innerHTML = html;
-    } catch(e) { c.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; }
-  }
 
-  // ── NAMESERVERS ──
-  views.nameservers = function() {
-    setToolbar(`<span class="c" onclick="document.getElementById('nsd').focus()">🔗 Enter domain</span>`);
-    panel.innerHTML = `
-      <div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Check nameservers and detect hosting provider (1-grid vs external)</div>
-      <div class="search-bar">
-        <input id="nsd" placeholder="Domain (e.g. example.co.za)" onkeydown="if(event.key==='Enter') checkNameservers()">
-        <button onclick="checkNameservers()">Check NS</button>
-      </div>
-      <div id="nsres"></div>`;
-    document.getElementById('nsd').focus();
+      readStream();
+    }).catch(function(err) {
+      statusEl.innerHTML = '<span style="color:#f87171;font-size:11px">⚠ Connection failed: ' + err.message + '</span>';
+      input.disabled = false;
+      sendBtn.disabled = false;
+      sendBtn.textContent = 'Send';
+    });
   }
-  window.checkNameservers = async function() {
-    const domain = document.getElementById('nsd').value.trim();
-    if (!domain) return;
-    const c = document.getElementById('nsres');
-    c.innerHTML = '<div class="loading">Checking nameservers...</div>';
-    try {
-      const d = await apiPost('/nameservers', { domain });
-      const cls = d.is_grid ? 'grid' : 'external';
-      const label = d.is_grid ? '1-grid' : d.provider;
-      let html = `<div class="detect-box" style="margin-bottom:8px"><span class="badge ${cls}">${esc(label)}</span><span style="font-size:13px">${esc(d.domain)}</span>${d.hosting_type ? `<span style="font-size:11px;color:#64748b">${esc(d.hosting_type)}</span>` : ''}</div>`;
-      html += '<div class="section-label">Nameserver Records</div>';
-      d.nameservers.forEach(ns => {
-        html += `<div class="card" style="padding:6px 10px;margin-bottom:2px"><div class="val mono">${esc(ns)}</div></div>`;
-      });
-      if (d.provider && !d.is_grid) {
-        html += `<div class="card" style="margin-top:6px;border-color:#7c2d12"><div class="title" style="color:#fdba74">⚠ External Hosting</div><div class="preview">This domain uses ${esc(d.provider)} nameservers. It is NOT hosted with 1-grid.</div></div>`;
-      }
-      c.innerHTML = html;
-    } catch(e) { c.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; }
-  }
+  function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function showConvDetail(el, data) {
+    var panel = document.getElementById('panel');
+    var isObj = typeof data === 'object';
+    var cv = isObj ? data : {};
+    try { if (!isObj) cv = JSON.parse(data); } catch(e) {}
 
-  // ── LOG ANALYSIS ──
-  views.logs = function() {
-    setToolbar(`<span class="c" onclick="document.getElementById('lg').focus()">📄 Paste logs</span><span class="c" onclick="document.getElementById('lg').value='';document.getElementById('lgres').innerHTML=''">🗑️ Clear</span>`);
-    panel.innerHTML = `
-      <div style="display:flex;flex-direction:column;gap:8px;height:100%">
-        <div style="font-size:12px;color:#94a3b8">Paste error logs, access logs, or any text. Detects PHP errors, MySQL, HTTP codes, WordPress, timeouts, disk/memory limits.</div>
-        <textarea id="lg" placeholder="Paste log content here...
-[25-May-2026 12:00:00] PHP Fatal Error: Allowed memory size exhausted in /var/www/wp-content/plugins/...
-2026-05-25 12:00:01 1.2.3.4 GET /index.php 500
-2026-05-25 12:00:02 MySQL: SQLSTATE[HY000] [1040] Too many connections
-..." style="min-height:160px;padding:10px;border:1px solid #334155;border-radius:6px;background:#1e293b;color:#e2e8f0;font-size:12px;font-family:monospace;outline:none;resize:vertical"></textarea>
-        <div><button onclick="analyzeLogs()" style="padding:8px 20px;background:#d97706;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500">Analyze Logs</button></div>
-        <div id="lgres"></div>
-      </div>`;
-  }
-  window.analyzeLogs = async function() {
-    const text = document.getElementById('lg').value.trim();
-    if (!text) return;
-    const c = document.getElementById('lgres');
-    c.innerHTML = '<div class="loading">Analyzing...</div>';
-    try {
-      const d = await apiPost('/log/analyze', { content: text });
-      if (!d.findings || d.findings.length === 0) {
-        c.innerHTML = `<div class="card"><div class="title">No patterns detected</div><div class="meta">${d.total_lines} lines scanned — no common error patterns found</div></div>`;
-        return;
-      }
-      let html = `<div class="card" style="margin-bottom:8px"><div class="title">📄 Log Analysis</div><div class="meta">${d.total_lines} lines · ${d.findings.length} pattern types</div></div>`;
-      d.findings.forEach(f => {
-        const iconMap = { PHP_Errors: '🐘', MySQL_Errors: '🗄️', HTTP_4xx: '🚫', HTTP_5xx: '💥', WordPress: '🔗', Connection_Timeout: '⏱️', Resource_Limit: '💾', Permission_Denied: '🔒' };
-        const icon = iconMap[f.type] || '⚠️';
-        html += `<div class="card" style="margin-bottom:4px;${f.type === 'HTTP_5xx' || f.type === 'Resource_Limit' ? 'border-color:#7f1d1d' : ''}">`;
-        html += `<div class="title">${icon} ${esc(f.type.replace(/_/g,' '))} <span style="font-weight:400;color:#64748b">(${f.count} occurrences)</span></div>`;
-        if (f.samples && f.samples.length) {
-          f.samples.forEach(s => {
-            html += `<div class="preview mono" style="font-family:monospace;font-size:11px;padding:2px 0">${esc(s.substr(0,200))}</div>`;
-          });
+    var html = '<div class="back-btn" onclick="htmx.ajax(\'GET\', \'/views/conversations\', {target:\'#panel\',swap:\'innerHTML\'})">← Back to conversations</div>';
+    html += '<div class="conv-detail">';
+
+    // Header
+    var title = esc(cv.source || cv.role || 'Conversation');
+    var cid = esc(cv.id || '');
+    var ts = esc(cv.timestamp || '');
+    var domain = cv.domain || (cv.metadata && cv.metadata.domain) || '';
+    html += '<div style="background:#0f1729;border:1px solid #1e293b;border-radius:8px;padding:10px 14px;margin-bottom:8px">';
+    html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+    html += '<span style="font-size:14px;font-weight:600">' + title + '</span>';
+    if (cid) html += '<span style="font-size:11px;color:#64748b">#' + cid + '</span>';
+    if (domain) html += '<span style="background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:12px;font-size:11px">' + domain + '</span>';
+    html += '</div>';
+    if (ts) html += '<div style="font-size:11px;color:#64748b;margin-top:3px">' + ts + '</div>';
+    html += '</div>';
+
+    // Messages
+    var msgs = cv.messages || [];
+    if (msgs.length === 0 && cv.content) {
+      msgs = [{role: cv.role || 'user', content: cv.content, thoughts: cv.thoughts, commands: cv.commands}];
+    }
+    for (var i = 0; i < msgs.length; i++) {
+      var m = msgs[i];
+      var role = m.role || 'user';
+      var content = esc(m.content || '');
+      var thoughts = m.thoughts || [];
+      var commands = m.commands || [];
+      var cls = role === 'user' || role === 'client' ? 'user' : role === 'assistant' || role === 'support' ? 'assistant' : 'system';
+      html += '<div class="msg-row ' + cls + '">';
+      html += '<div class="label">' + esc(role) + '</div>';
+      html += '<div class="content">' + content + '</div>';
+      if (thoughts.length) {
+        for (var t = 0; t < thoughts.length; t++) {
+          html += '<div class="meta">🤔 ' + esc(thoughts[t]) + '</div>';
         }
-        html += `</div>`;
-      });
-      c.innerHTML = html;
-    } catch(e) { c.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; }
-  }
-
-  // ── DNS LOOKUP ──
-  views.dns = function() {
-    setToolbar(`
-      <span class="c" onclick="document.getElementById('dnsd').focus()">🔎 Enter domain</span>
-      <span class="c" onclick="document.getElementById('dnst').value='ANY';doDNS()">ANY</span>
-      <span class="c" onclick="document.getElementById('dnst').value='A';doDNS()">A</span>
-      <span class="c" onclick="document.getElementById('dnst').value='MX';doDNS()">MX</span>
-      <span class="c" onclick="document.getElementById('dnst').value='TXT';doDNS()">TXT</span>
-      <span class="c" onclick="document.getElementById('dnst').value='NS';doDNS()">NS</span>
-      <span class="c" onclick="document.getElementById('dnst').value='CNAME';doDNS()">CNAME</span>
-      <span class="c" onclick="document.getElementById('dnst').value='SOA';doDNS()">SOA</span>
-    `);
-    panel.innerHTML = `
-      <div style="font-size:12px;color:#94a3b8;margin-bottom:6px">DNS record lookup (dig equivalent)</div>
-      <div class="search-bar">
-        <input id="dnsd" placeholder="Domain" style="flex:2" onkeydown="if(event.key==='Enter') doDNS()">
-        <select id="dnst" style="padding:8px 10px;border:1px solid #334155;border-radius:6px;background:#1e293b;color:#e2e8f0;font-size:12px;outline:none">
-          <option value="ANY">ANY</option><option value="A">A</option><option value="AAAA">AAAA</option>
-          <option value="MX">MX</option><option value="NS">NS</option><option value="TXT">TXT</option>
-          <option value="CNAME">CNAME</option><option value="SOA">SOA</option>
-        </select>
-        <button onclick="doDNS()">Lookup</button>
-      </div>
-      <div id="dnsres"></div>`;
-    document.getElementById('dnsd').focus();
-  }
-  window.doDNS = async function() {
-    const domain = document.getElementById('dnsd').value.trim();
-    const type = document.getElementById('dnst').value;
-    if (!domain) return;
-    const c = document.getElementById('dnsres');
-    c.innerHTML = '<div class="loading">Looking up...</div>';
-    try {
-      const d = await apiPost('/tools/dig', { domain, query_type: type });
-      if (!d.success) { c.innerHTML = `<div class="empty">Lookup failed: ${esc(d.error||'')}</div>`; return; }
-      let results;
-      try { results = typeof d.stdout === 'string' ? JSON.parse(d.stdout) : d.stdout; } catch(e) { results = d.stdout; }
-      let html = `<div class="card" style="margin-bottom:6px"><div class="title">🔎 ${esc(domain)} ${type}</div></div>`;
-      if (Array.isArray(results)) {
-        results.forEach(r => { html += `<div class="card" style="padding:6px 10px;margin-bottom:2px"><div class="val mono">${esc(r)}</div></div>`; });
-      } else if (typeof results === 'object') {
-        for (const [k, v] of Object.entries(results)) {
-          const vals = Array.isArray(v) ? v.join(', ') : String(v);
-          html += `<div class="card" style="padding:6px 10px;margin-bottom:2px"><div class="meta">${k}</div><div class="val mono">${esc(vals)}</div></div>`;
+      }
+      if (commands.length) {
+        for (var c = 0; c < commands.length; c++) {
+          html += '<div class="cmd">$ ' + esc(commands[c]) + '</div>';
         }
-      } else {
-        html += `<div class="card" style="padding:6px 10px"><div class="val mono">${esc(String(results))}</div></div>`;
-      }
-      c.innerHTML = html;
-    } catch(e) { c.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; }
-  }
-
-  // ── WHOIS ──
-  views.whois = function() {
-    setToolbar(`<span class="c" onclick="document.getElementById('whd').focus()">📇 Enter domain</span>`);
-    panel.innerHTML = `
-      <div class="search-bar">
-        <input id="whd" placeholder="Domain (e.g. example.co.za)" onkeydown="if(event.key==='Enter') doWhois()">
-        <button onclick="doWhois()">WHOIS Lookup</button>
-      </div>
-      <div id="whres"></div>`;
-    document.getElementById('whd').focus();
-  }
-  window.doWhois = async function() {
-    const domain = document.getElementById('whd').value.trim();
-    if (!domain) return;
-    const c = document.getElementById('whres');
-    c.innerHTML = '<div class="loading">Looking up WHOIS...</div>';
-    try {
-      const d = await apiPost('/tools/whois', { domain });
-      let html = `<div class="card" style="margin-bottom:6px"><div class="title">📇 ${esc(d.domain)}</div></div>`;
-      html += '<div class="details-grid">';
-      if (d.registrar) html += `<span class="k">Registrar</span><span class="v">${esc(d.registrar)}</span>`;
-      if (d.expiry) html += `<span class="k">Expiry</span><span class="v">${esc(d.expiry)}</span>`;
-      if (d.status) html += `<span class="k">Status</span><span class="v">${esc(d.status)}</span>`;
-      html += '</div>';
-      if (d.raw) {
-        html += `<div class="card" style="margin-top:6px"><div class="title">Raw WHOIS</div><div class="preview mono" style="font-family:monospace;font-size:10px;max-height:200px;overflow-y:auto">${esc(d.raw)}</div></div>`;
-      }
-      c.innerHTML = html;
-    } catch(e) { c.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; }
-  }
-
-  // ── PORT SCAN ──
-  views.ports = function() {
-    setToolbar(`<span class="c" onclick="document.getElementById('ptd').focus()">🔌 Enter domain/IP</span>`);
-    panel.innerHTML = `
-      <div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Scan common TCP ports (FTP, SSH, SMTP, HTTP, HTTPS, cPanel, MySQL, etc.)</div>
-      <div class="search-bar">
-        <input id="ptd" placeholder="Domain or IP" onkeydown="if(event.key==='Enter') doPortScan()">
-        <button onclick="doPortScan()">Scan Ports</button>
-      </div>
-      <div id="ptres"></div>`;
-    document.getElementById('ptd').focus();
-  }
-  window.doPortScan = async function() {
-    const domain = document.getElementById('ptd').value.trim();
-    if (!domain) return;
-    const c = document.getElementById('ptres');
-    c.innerHTML = '<div class="loading">Scanning ports...</div>';
-    try {
-      const d = await apiPost('/tools/portscan', { domain });
-      let html = `<div class="card" style="margin-bottom:6px"><div class="title">🔌 Port Scan: ${esc(d.domain)}</div><div class="meta">${d.open_ports ? d.open_ports.length : 0} ports open</div></div>`;
-      if (d.open_ports && d.open_ports.length) {
-        d.open_ports.forEach(p => {
-          html += `<div class="card" style="padding:6px 10px;margin-bottom:2px"><div class="title">${esc(p.service)} <span style="font-weight:400;color:#64748b">port ${p.port}</span></div></div>`;
-        });
-      } else {
-        html += '<div class="empty">No common ports open (or host unreachable)</div>';
-      }
-      c.innerHTML = html;
-    } catch(e) { c.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; }
-  }
-
-  // ── HTTP CHECK ──
-  views.httpcheck = function() {
-    setToolbar(`<span class="c" onclick="document.getElementById('hcd').focus()">🌍 Enter domain</span>`);
-    panel.innerHTML = `
-      <div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Check HTTP, HTTPS response codes and SSL certificate expiry</div>
-      <div class="search-bar">
-        <input id="hcd" placeholder="Domain (e.g. example.co.za)" onkeydown="if(event.key==='Enter') doHttpCheck()">
-        <button onclick="doHttpCheck()">Check</button>
-      </div>
-      <div id="hcres"></div>`;
-    document.getElementById('hcd').focus();
-  }
-  window.doHttpCheck = async function() {
-    const domain = document.getElementById('hcd').value.trim();
-    if (!domain) return;
-    const c = document.getElementById('hcres');
-    c.innerHTML = '<div class="loading">Checking...</div>';
-    try {
-      const d = await apiPost('/tools/httpcheck', { domain });
-      let html = `<div class="card" style="margin-bottom:6px"><div class="title">🌍 ${esc(d.domain)}</div></div>`;
-      html += '<div class="details-grid">';
-      if (d.http) {
-        const code = d.http.status_code;
-        const cls = code >= 400 ? 'red' : code >= 300 ? 'amber' : 'green';
-        html += `<span class="k">HTTP</span><span class="v ${cls}">${code}</span>`;
-      }
-      if (d.https) {
-        const code = d.https.status_code;
-        const cls = code >= 400 ? 'red' : code >= 300 ? 'amber' : 'green';
-        html += `<span class="k">HTTPS</span><span class="v ${cls}">${code}</span>`;
-      }
-      if (d.ssl_days !== null && d.ssl_days !== undefined) {
-        const cls = d.ssl_days < 0 ? 'red' : d.ssl_days < 14 ? 'red' : d.ssl_days < 60 ? 'amber' : 'green';
-        const txt = d.ssl_days < 0 ? 'EXPIRED' : d.ssl_days + ' days';
-        html += `<span class="k">SSL</span><span class="v ${cls}">${txt}</span>`;
       }
       html += '</div>';
-      if (d.http && d.http.error) html += `<div class="card" style="margin-top:6px;border-color:#7f1d1d"><div class="preview" style="color:#f87171">HTTP error: ${esc(d.http.error)}</div></div>`;
-      c.innerHTML = html;
-    } catch(e) { c.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; }
+    }
+    html += '</div>';
+    panel.innerHTML = html;
   }
-
-  // ── SUBDOMAINS ──
-  views.subdomains = function() {
-    setToolbar(`<span class="c" onclick="document.getElementById('sbd').focus()">🗂️ Enter domain</span>`);
-    panel.innerHTML = `
-      <div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Enumerate common subdomains (www, mail, cpanel, ftp, api, etc.)</div>
-      <div class="search-bar">
-        <input id="sbd" placeholder="Domain" onkeydown="if(event.key==='Enter') doSubdomains()">
-        <button onclick="doSubdomains()">Enumerate</button>
-      </div>
-      <div id="sbres"></div>`;
-    document.getElementById('sbd').focus();
-  }
-  window.doSubdomains = async function() {
-    const domain = document.getElementById('sbd').value.trim();
-    if (!domain) return;
-    const c = document.getElementById('sbres');
-    c.innerHTML = '<div class="loading">Enumerating...</div>';
-    try {
-      const d = await apiPost('/tools/subdomains', { domain });
-      let html = `<div class="card" style="margin-bottom:6px"><div class="title">🗂️ Subdomains: ${esc(d.domain)}</div><div class="meta">${d.subdomains ? d.subdomains.length : 0} found</div></div>`;
-      if (d.subdomains && d.subdomains.length) {
-        d.subdomains.forEach(sd => {
-          const info = sd.ips ? sd.ips.join(', ') : sd.cname ? 'CNAME → '+sd.cname : '';
-          html += `<div class="card" style="padding:5px 10px;margin-bottom:2px"><div class="val mono">${esc(sd.subdomain)} → ${esc(info)}</div></div>`;
-        });
-      } else {
-        html += '<div class="empty">No common subdomains found</div>';
-      }
-      c.innerHTML = html;
-    } catch(e) { c.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; }
-  }
-
-  // ── BLOCKLISTS ──
-  views.blocklists = function() {
-    setToolbar(`<span class="c" onclick="document.getElementById('bld').focus()">🛡️ Enter IP</span>`);
-    panel.innerHTML = `
-      <div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Check an IP address against DNS blocklists (Spamhaus, SpamCop, SORBS, Barracuda, PSBL)</div>
-      <div class="search-bar">
-        <input id="bld" placeholder="IP address (e.g. 1.2.3.4)" onkeydown="if(event.key==='Enter') doBlocklists()">
-        <button onclick="doBlocklists()">Check</button>
-      </div>
-      <div id="blres"></div>`;
-    document.getElementById('bld').focus();
-  }
-  window.doBlocklists = async function() {
-    const ip = document.getElementById('bld').value.trim();
-    if (!ip) return;
-    const c = document.getElementById('blres');
-    c.innerHTML = '<div class="loading">Checking blocklists...</div>';
-    try {
-      const d = await (await fetch('/tools/blocklists?ip='+encodeURIComponent(ip))).json();
-      let html = `<div class="card" style="margin-bottom:6px"><div class="title">🛡️ IP: ${esc(d.ip)}</div></div>`;
-      if (d.blocklists && d.blocklists.length) {
-        d.blocklists.forEach(b => {
-          const cls = b.listed ? 'red' : 'green';
-          html += `<div class="card" style="padding:6px 10px;margin-bottom:2px"><div class="title">${esc(b.list)}</div><div class="val ${cls}">${b.listed ? 'LISTED ⚠' : 'Clean ✓'}</div></div>`;
-        });
-      }
-      c.innerHTML = html;
-    } catch(e) { c.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; }
-  }
-
-  // ── TOAST ──
-  function toast(msg, type) {
-    const el = document.createElement('div');
-    el.style.cssText = `position:fixed;bottom:60px;left:50%;transform:translateX(-50%);padding:8px 16px;border-radius:6px;font-size:13px;z-index:999;${type==='err'?'background:#ef4444;color:#fff':type==='warn'?'background:#d97706;color:#fff':'background:#2563eb;color:#fff'}`;
-    el.textContent = msg;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 4000);
-  }
-
-  // Detect file:// protocol and warn
-  if (window.location.protocol === 'file:') {
-    document.getElementById('panel').innerHTML = `<div class="card" style="border-color:#ef4444;padding:20px;text-align:center;margin-top:40px">
-      <div style="font-size:18px;color:#f87171;margin-bottom:8px">⚠ Cannot Load</div>
-      <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">This app must be served via HTTP. Open <b>http://localhost:8000</b> in your browser instead.</div>
-      <div style="font-size:12px;color:#64748b">Run: <code style="background:#1e293b;padding:2px 6px;border-radius:3px">python -m uvicorn app.main:app --host 0.0.0.0 --port 8000</code></div>
-    </div>`;
-  }
-
-  // ── INIT ──
-  if (window.location.protocol !== 'file:') {
-    showView('dashboard');
-    fetch('/health').then(r=>r.json()).then(d => { document.getElementById('sname').textContent = 'ok'; }).catch(() => { document.getElementById('sdot').className='dot red'; document.getElementById('sname').textContent='offline'; toast('Backend server unreachable', 'err'); });
-    fetch('/health/ollama').then(r=>r.json()).then(d => { document.getElementById('oname').textContent = d.status==='ok' ? 'Ollama: on' : 'Ollama: off'; document.getElementById('odot').className = d.status==='ok' ? 'dot green' : 'dot yellow'; }).catch(() => { document.getElementById('odot').className='dot red'; document.getElementById('oname').textContent='Ollama: err'; });
-  }
+  fetch('/health').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('sname').textContent = 'ok';
+  }).catch(function(){
+    document.getElementById('sdot').className = 'dot red';
+    document.getElementById('sname').textContent = 'offline';
+  });
+  fetch('/health/ollama').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('oname').textContent = d.status==='ok' ? 'Ollama' : 'Ollama off';
+    document.getElementById('odot').className = d.status==='ok' ? 'dot green' : 'dot yellow';
+  }).catch(function(){
+    document.getElementById('odot').className = 'dot red';
+    document.getElementById('oname').textContent = 'Ollama err';
+  });
 </script>
 </body>
 </html>

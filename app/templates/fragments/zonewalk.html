@@ -1,0 +1,7 @@
+<div class="search-bar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:#0f1729;border:1px solid #1e293b;border-radius:6px;padding:6px 10px">
+  <input id="zwd" name="domain" placeholder="Domain to diagnose (e.g. example.co.za)" style="flex:1;min-width:200px;background:#1e293b;border:1px solid #334155;border-radius:5px;padding:6px 10px;font-size:13px;color:#e2e8f0">
+  <button hx-post="/views/zonewalk/run" hx-include="#zwd" hx-target="#zwres" hx-indicator="#zwload" style="background:#2563eb;border:none;border-radius:5px;padding:6px 12px;font-size:12px;font-weight:500;color:#fff;cursor:pointer">Zonewalk</button>
+  <button hx-post="/views/zonewalk/run" hx-include="previous input" hx-vals='{"deep":"true"}' hx-target="#zwres" hx-indicator="#zwload" style="background:#d97706;border:none;border-radius:5px;padding:6px 12px;font-size:12px;font-weight:500;color:#fff;cursor:pointer">Deep</button>
+</div>
+<div id="zwload" class="htmx-indicator loading" style="margin:4px 0;padding:4px;text-align:center;color:#94a3b8;font-size:11px">Running zonewalk...</div>
+<div id="zwres" style="margin-top:4px"></div>

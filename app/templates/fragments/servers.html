@@ -1,0 +1,6 @@
+<div style="font-size:12px;color:#94a3b8;margin-bottom:6px">All server IPs from tickets with ticket counts and known issues</div>
+<div class="search-bar">
+  <input id="svq" name="q" placeholder="Filter by IP, hostname, domain...">
+  <button hx-post="/views/servers/filter" hx-include="#svq" hx-target="#svres">Filter</button>
+</div>
+<div id="svres" hx-trigger="load" hx-get="/views/servers/filter?q=" hx-target="this"></div>

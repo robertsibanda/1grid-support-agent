@@ -1,0 +1,7 @@
+<div class="search-bar">
+  <input id="whd" name="domain" placeholder="Domain (e.g. example.co.za)">
+  <button hx-post="/views/whois/lookup" hx-include="#whd" hx-target="#whres" hx-indicator="#whload">WHOIS Lookup</button>
+</div>
+<div id="whload" class="htmx-indicator loading">Looking up WHOIS...</div>
+<div id="whres"></div>
+<script>htmx.on('htmx:load',function(e){var i=e.detail.elt.querySelector('#whd');if(i)i.focus()})</script>

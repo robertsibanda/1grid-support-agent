@@ -2,6 +2,7 @@ import json
 import logging
 from datetime import datetime
 from app.agent.ollama_client import OllamaClient
+from app.agent.groq_client import GroqClient
 from app.rag.retriever import retrieve_context
 from app.warehouse.queries import WarehouseDB
 from app.zonewalk.runner import run_zonewalk
@@ -12,7 +13,13 @@ logger = logging.getLogger(__name__)
 class SupportPipeline:
     def __init__(self):
         self.ollama = OllamaClient()
+        self.groq = GroqClient()
         self.warehouse = WarehouseDB()
+        self.use_groq = bool(settings.groq_api_key)
+        if self.use_groq:
+            logger.info(f"Using Groq API (model: {settings.groq_model})")
+        else:
+            logger.info("No Groq API key — falling back to local Ollama")
 
     async def process_ticket(self, domain: str, issue: str,
                              ticket_id: str = None, customer_email: str = None) -> dict:
@@ -47,7 +54,8 @@ class SupportPipeline:
 
         steps.append({"step": "model_diagnosis", "status": "running"})
         try:
-            diagnosis = await self.ollama.diagnose(
+            llm = self.groq if self.use_groq else self.ollama
+            diagnosis = await llm.diagnose(
                 domain=domain,
                 issue=issue,
                 zonewalk_output=zonewalk_result.get("stdout", ""),
@@ -61,7 +69,7 @@ class SupportPipeline:
                 "raw_response": f"Error during model diagnosis: {str(e)}",
                 "confidence": "Low",
                 "needs_escalation": True,
-                "model": settings.ollama_model
+                "model": settings.groq_model if self.use_groq else settings.ollama_model
             }
             steps[-1]["status"] = "failed"
             steps[-1]["error"] = str(e)
@@ -112,7 +120,8 @@ class SupportPipeline:
         zonewalk_result = run_zonewalk(domain)
         kb_context = retrieve_context(f"{domain} {issue}")
 
-        diagnosis = await self.ollama.diagnose(
+        llm = self.groq if self.use_groq else self.ollama
+        diagnosis = await llm.diagnose(
             domain=domain,
             issue=issue or "General inquiry",
             zonewalk_output=zonewalk_result.get("stdout", ""),

@@ -1,0 +1,13 @@
+<div style="font-size:12px;color:#94a3b8;margin-bottom:6px">DNS record lookup (dig equivalent)</div>
+<div class="search-bar">
+  <input id="dnsd" name="domain" placeholder="Domain" style="flex:2">
+  <select id="dnst" name="type" style="padding:8px 10px;border:1px solid #334155;border-radius:6px;background:#1e293b;color:#e2e8f0;font-size:12px;outline:none">
+    <option value="ANY">ANY</option><option value="A">A</option><option value="AAAA">AAAA</option>
+    <option value="MX">MX</option><option value="NS">NS</option><option value="TXT">TXT</option>
+    <option value="CNAME">CNAME</option><option value="SOA">SOA</option>
+  </select>
+  <button hx-post="/views/dns/lookup" hx-include="#dnsd,#dnst" hx-target="#dnsres" hx-indicator="#dnsload">Lookup</button>
+</div>
+<div id="dnsload" class="htmx-indicator loading">Looking up...</div>
+<div id="dnsres"></div>
+<script>htmx.on('htmx:load',function(e){var i=e.detail.elt.querySelector('#dnsd');if(i)i.focus()})</script>

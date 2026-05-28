@@ -169,6 +169,7 @@ class ZonewalkResult:
     http_status: Optional[dict] = None
     https_status: Optional[dict] = None
     ssl_expiry_days: Optional[int] = None
+    ssl_issuer: Optional[str] = None
     open_ports: list[tuple] = field(default_factory=list)
     blocklists: list[dict] = field(default_factory=list)
     subdomains: list[dict] = field(default_factory=list)
@@ -256,11 +257,12 @@ def check_blocklists(ip: str, timeout: float = 3) -> list[dict]:
     return results
 
 
-def http_check(domain: str, timeout: float = 10) -> tuple[Optional[dict], Optional[dict], Optional[int]]:
+def http_check(domain: str, timeout: float = 10) -> tuple[Optional[dict], Optional[dict], Optional[int], Optional[str]]:
     """Check HTTP and HTTPS status."""
     http_status = None
     https_status = None
     ssl_days = None
+    ssl_issuer = None
 
     try:
         r = httpx.get(f"http://{domain}", timeout=timeout, follow_redirects=True)
@@ -282,10 +284,17 @@ def http_check(domain: str, timeout: float = 10) -> tuple[Optional[dict], Option
                 if cert and "notAfter" in cert:
                     exp = datetime.strptime(cert["notAfter"], "%b %d %H:%M:%S %Y %Z")
                     ssl_days = (exp.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)).days
+                if cert:
+                    for attr_list in cert.get("issuer", []):
+                        for key, value in attr_list:
+                            if key == "organizationName":
+                                ssl_issuer = value
+                            elif key == "commonName" and not ssl_issuer:
+                                ssl_issuer = value
     except Exception:
         pass
 
-    return http_status, https_status, ssl_days
+    return http_status, https_status, ssl_days, ssl_issuer
 
 
 def enum_subdomains(domain: str, timeout: float = 3) -> list[dict]:
@@ -445,10 +454,11 @@ def run_zonewalk_full(
     result.soa = res.soa(domain)
 
     # ── HTTP / HTTPS / SSL ──
-    http_s, https_s, ssl_d = http_check(domain)
+    http_s, https_s, ssl_d, ssl_iss = http_check(domain)
     result.http_status = http_s
     result.https_status = https_s
     result.ssl_expiry_days = ssl_d
+    result.ssl_issuer = ssl_iss
     if ssl_d is not None and ssl_d < 0:
         result.issues.append("SSL_EXPIRED")
     elif ssl_d is not None and ssl_d < 14:
@@ -474,8 +484,7 @@ def run_zonewalk_full(
         result.blocklists = check_blocklists(result.a_records[0])
 
     # ── Subdomains ──
-    if deep:
-        result.subdomains = enum_subdomains(domain)
+    result.subdomains = enum_subdomains(domain)
 
     result.success = True
     return result
