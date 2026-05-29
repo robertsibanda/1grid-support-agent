@@ -704,9 +704,6 @@ async def _handle_chat_stream(message: str, session_id: str):
     history = sessions.get_history(session_id, 10)
 
     yield _ssse("status", {"text": "Processing..."})
-    
-    msg_lower = msg.lower()
-    msg_lc = re.sub(r'[?!.]', '', msg_lower).strip()
 
     # ── Slash commands ──
     if msg == "/help":
@@ -870,30 +867,7 @@ async def _handle_chat_stream(message: str, session_id: str):
         issue = msg.replace(raw, "", 1).strip() or "General inquiry"
 
     if not domain:
-        # ── AI Chat for non-domain queries ──
-        # Check for common canned phrases first (instant response)
-        general_responses = {
-            "thanks": "You're welcome! 😊 Happy to help. Let me know if you need anything else.",
-            "thank you": "You're welcome! 😊 Happy to help. Let me know if you need anything else.",
-            "goodbye": "Goodbye! 👋 Feel free to come back anytime you need help.",
-            "bye": "Goodbye! 👋 Feel free to come back anytime you need help.",
-            "hello": "Hello! 👋 I'm Robert, your 1-grid support agent. How can I help you today?",
-            "hi": "Hi there! 👋 How can I assist you with your 1-grid hosting or domains today?",
-        }
-        
-        matched_text = ""
-        for key, resp in general_responses.items():
-            if key == msg_lc:
-                matched_text = resp
-                break
-        
-        if matched_text:
-            sessions.add_message(session_id, "assistant", matched_text)
-            yield _ssse("html", {"html": f'<div style="margin-top:6px;font-size:14px;color:#e2e8f0">{matched_text}</div>'})
-            yield _ssse("done", {})
-            return
-
-        # ── LLM Chat ──
+        # ── AI-first chat (every message through LLM, no hardcoded responses) ──
         yield _ssse("status", {"text": "🤖 Thinking..."})
         ai_container = (
             '<div id="ai-analysis" style="background:#0f1729;border:1px solid #334155;border-radius:8px;padding:8px 10px;margin:8px 0">'
@@ -943,112 +917,85 @@ async def _handle_chat_stream(message: str, session_id: str):
     # ── Domain diagnosis ──
     issue = issue or "General inquiry"
 
-    yield _ssse("status", {"text": f"🔍 Running zonewalk for <b>{esc(domain)}</b>..."})
+    yield _ssse("status", {"text": f"🔍 Diagnosing <b>{esc(domain)}</b>..."})
 
+    # Run zonewalk, KB, history in background first
+    zw_text = ""
+    kb_hits = []
+    domain_issues = []
     try:
         zw_result = await asyncio.to_thread(run_zonewalk, domain)
         zw_text = zw_result.get("stdout", "") or zw_result.get("error", "No output")
-        yield _ssse("html", {"html": _fmt_zw_html(zw_text)})
+        warehouse.save_zonewalk_result(domain, zw_result)
     except Exception as e:
-        yield _ssse("html", {"html": f'<div style="color:#f87171;padding:6px 0">⚠ Zonewalk failed: {esc(str(e))}</div>'})
         zw_text = ""
-
-    # KB
-    yield _ssse("status", {"text": "📚 Searching knowledge base..."})
     try:
         kb_hits = warehouse.search_kb(f"{domain} {issue}", 4)
-        if kb_hits:
-            html_parts = ['<div style="margin:4px 0"><b>📚 Relevant KB articles:</b>']
-            for h in kb_hits:
-                html_parts.append(f'<div style="padding:3px 0 3px 12px;font-size:12px;color:#60a5fa">📄 {esc(h.get("title",""))}</div>')
-            html_parts.append('</div>')
-            yield _ssse("html", {"html": "".join(html_parts)})
     except Exception:
         pass
-
-    # History
     try:
         domain_issues = warehouse.search_issues(domain)
-        if domain_issues:
-            html_parts = ['<div style="margin:4px 0"><b>📋 Previous issues for this domain:</b>']
-            for i in domain_issues[:3]:
-                html_parts.append(f'<div style="padding:2px 0 2px 12px;font-size:11px;color:#94a3b8">'
-                    f'#{i["id"]} [{i["status"]}] {esc(i.get("issue_type",""))}</div>')
-            html_parts.append('</div>')
-            yield _ssse("html", {"html": "".join(html_parts)})
     except Exception:
         pass
 
-    # Summary (instant, no AI)
-    summary_html = '<div style="margin-top:6px">'
-    fail_count = zw_text.count("FAIL") + zw_text.count("MISSING")
-    ok_count = zw_text.count("OK") + zw_text.count("PASS")
-    warn_count = zw_text.count("WARN")
-
-    summary_html += '<div style="background:#1e293b;border-radius:8px;padding:10px 12px;margin:6px 0">'
-    summary_html += '<b style="color:#f1f5f9;font-size:13px">📊 Diagnosis Summary</b>'
-    summary_html += '<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">'
-    summary_html += f'<span style="color:#f87171;font-size:12px">🔴 {fail_count} issues</span>'
-    summary_html += f'<span style="color:#4ade80;font-size:12px">🟢 {ok_count} passed</span>'
-    if warn_count:
-        summary_html += f'<span style="color:#facc15;font-size:12px">🟡 {warn_count} warnings</span>'
-    summary_html += '</div>'
-
-    # Smart suggestions based on zonewalk output
-    suggestions = []
-    if "NO_NS" in zw_text or "No NS records" in zw_text:
-        suggestions.append("🔴 <b>No nameservers</b> — point the domain to ns1.hostserv.co.za / ns2.hostserv.co.za")
-    if "NO_A_RECORD" in zw_text:
-        suggestions.append("🔴 <b>No A record</b> — add an A record pointing to your server IP")
-    if "NO_MX" in zw_text or "No MX records" in zw_text:
-        suggestions.append("🔴 <b>No MX records</b> — add MX records for mail delivery")
-    if "NO_SPF" in zw_text:
-        suggestions.append("🟡 <b>Missing SPF</b> — add: <code>v=spf1 a mx include:relay.mailchannels.net ~all</code>")
-    if "NO_DKIM" in zw_text:
-        suggestions.append("🟡 <b>Missing DKIM</b> — configure DKIM signing on your mail server")
-    if "NO_DMARC" in zw_text:
-        suggestions.append("🟡 <b>Missing DMARC</b> — add a DMARC policy to control email handling")
-    if "NOT_GRID" in zw_text:
-        suggestions.append("ℹ️ <b>Not a 1-grid domain</b> — check with the domain registrar for DNS changes")
-    if "SSL_EXP" in zw_text or "expired" in zw_text.lower():
-        suggestions.append("🔴 <b>SSL cert expired</b> — renew immediately to avoid browser warnings")
-
-    if suggestions:
-        summary_html += '<div style="margin-top:8px;border-top:1px solid #334155;padding-top:6px">'
-        summary_html += '<b style="color:#60a5fa;font-size:12px">💡 Suggestions:</b>'
-        for s in suggestions:
-            summary_html += f'<div style="font-size:12px;margin-top:4px;color:#cbd5e1">{s}</div>'
-        summary_html += '</div>'
-
-    if fail_count == 0:
-        summary_html += '<div style="margin-top:8px;color:#4ade80;font-size:12px">✅ No issues found — domain looks healthy!</div>'
-    else:
-        summary_html += f'<div style="margin-top:8px;color:#94a3b8;font-size:11px">Found {fail_count} issue(s) — review the suggestions above or check the zonewalk details.</div>'
-
-    summary_html += '</div>'
-    summary_html += '</div>'
-
-    yield _ssse("status", {"text": ""})
-    yield _ssse("html", {"html": summary_html})
-    sessions.add_message(session_id, "assistant", f"Domain {domain} diagnosed with {fail_count} issues")
-
-    # ── AI enhancement (streaming, may be slow) ──
-    yield _ssse("status", {"text": "🧠 AI analysis running in background..."})
+    # ── AI analysis first (streaming) ──
+    yield _ssse("status", {"text": "🧠 Running AI analysis..."})
     try:
-        from app.rag.retriever import retrieve_context
-        kb_context = retrieve_context(f"{domain} {issue}") or ""
-        warehouse_ctx = await _warehouse_context(f"{domain} {issue}")
-        history_text = ""
-        for h in history[:-1]:
-            history_text += f"{h['role']}: {h['content'][:300]}\n"
+        kb_ctx_raw = ""
+        if kb_hits:
+            parts = []
+            for a in kb_hits:
+                title = a.get("title", "Untitled")
+                content = (a.get("content", "") or "")[:800]
+                parts.append(f"--- {title} ---\n{content}")
+            kb_ctx_raw = "\n\n".join(parts)
+
+        # Gather additional context
+        quickrefs_raw = ""
+        try:
+            refs = warehouse.get_quick_ref()
+            if refs:
+                lines = []
+                for r in refs[:15]:
+                    lines.append(f"[{r.get('category','')}] {r.get('key_name','')}: {str(r.get('value',''))[:200]}")
+                quickrefs_raw = "\n".join(lines)
+        except Exception:
+            pass
+
+        past_issues_raw = ""
+        if domain_issues:
+            lines = []
+            for i in domain_issues[:5]:
+                lines.append(f"[{i['status']}] {i['issue_type']}: {(i.get('issue_summary','') or '')[:200]}")
+                if i.get('resolution'):
+                    lines.append(f"  Resolution: {(i['resolution'])[:200]}")
+            past_issues_raw = "\n".join(lines)
+
+        past_convs_raw = ""
+        try:
+            convs = warehouse.search_conversations_by_domain(domain, 5)
+            if convs:
+                lines = []
+                for c in convs[:5]:
+                    msg = (c.get("content","") or c.get("message","") or "")[:200]
+                    lines.append(f"[{c.get('timestamp','')[:10]}] {msg}")
+                past_convs_raw = "\n".join(lines)
+        except Exception:
+            pass
 
         prompt = (
             f"Domain: {domain}\n"
             f"Issue reported: {issue}\n\n"
-            f"=== HISTORY ===\n{history_text}\n"
             f"=== ZONEWALK OUTPUT ===\n{zw_text[:2500]}\n\n"
-            f"=== KB CONTEXT ===\n{kb_context[:1500]}\n\n"
-            f"=== WAREHOUSE DATA ===\n{warehouse_ctx[:1500]}\n\n"
+            f"=== KB ARTICLES ===\n{kb_ctx_raw[:1500]}\n\n"
+        )
+        if quickrefs_raw:
+            prompt += f"=== AVAILABLE COMMANDS ===\n{quickrefs_raw[:1500]}\n\n"
+        if past_issues_raw:
+            prompt += f"=== PAST ISSUES ===\n{past_issues_raw[:1500]}\n\n"
+        if past_convs_raw:
+            prompt += f"=== PAST CONVERSATIONS ===\n{past_convs_raw[:1500]}\n\n"
+        prompt += (
             "Analyze the issue and provide:\n"
             "1. ROOT_CAUSE: What is the underlying problem?\n"
             "2. DRAFT_RESPONSE: A complete response for the customer\n"
@@ -1088,11 +1035,86 @@ async def _handle_chat_stream(message: str, session_id: str):
                 parsed += f'<div style="color:#cbd5e1;margin:4px 0">{esc(p)}</div>'
         parsed += '</div>'
         yield _ssse("replace_last", {"html": parsed})
-        sessions.add_message(session_id, "assistant", full_response)
-
     except Exception as e:
-        logger.exception(f"AI enhancement failed: {e}")
-        yield _ssse("html", {"html": f'<div style="color:#94a3b8;font-size:11px;margin:4px 0">ℹ️ AI analysis unavailable (the summary above still applies)</div>'})
+        logger.exception(f"AI analysis failed: {e}")
+        yield _ssse("html", {"html": f'<div style="color:#f87171;padding:6px 0">⚠ AI analysis unavailable</div>'})
+
+    # ── Zonewalk details ──
+    if zw_text:
+        yield _ssse("html", {"html": _fmt_zw_html(zw_text)})
+
+    # ── KB articles ──
+    if kb_hits:
+        html_parts = ['<div style="margin:4px 0"><b>📚 Relevant KB articles:</b>']
+        for h in kb_hits:
+            html_parts.append(f'<div style="padding:3px 0 3px 12px;font-size:12px;color:#60a5fa">📄 {esc(h.get("title",""))}</div>')
+        html_parts.append('</div>')
+        yield _ssse("html", {"html": "".join(html_parts)})
+
+    # ── Previous issues ──
+    if domain_issues:
+        html_parts = ['<div style="margin:4px 0"><b>📋 Previous issues for this domain:</b>']
+        for i in domain_issues[:3]:
+            html_parts.append(f'<div style="padding:2px 0 2px 12px;font-size:11px;color:#94a3b8">'
+                f'#{i["id"]} [{i["status"]}] {esc(i.get("issue_type",""))}</div>')
+        html_parts.append('</div>')
+        yield _ssse("html", {"html": "".join(html_parts)})
+
+    # ── Summary ──
+    fail_count = zw_text.count("FAIL") + zw_text.count("MISSING")
+    ok_count = zw_text.count("OK") + zw_text.count("PASS")
+    warn_count = zw_text.count("WARN")
+
+    summary_html = '<div style="margin-top:4px">'
+    summary_html += '<div style="background:#1e293b;border-radius:8px;padding:10px 12px;margin:4px 0">'
+    summary_html += '<b style="color:#f1f5f9;font-size:13px">📊 Diagnosis Summary</b>'
+    summary_html += '<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">'
+    summary_html += f'<span style="color:#f87171;font-size:12px">🔴 {fail_count} issues</span>'
+    summary_html += f'<span style="color:#4ade80;font-size:12px">🟢 {ok_count} passed</span>'
+    if warn_count:
+        summary_html += f'<span style="color:#facc15;font-size:12px">🟡 {warn_count} warnings</span>'
+    summary_html += '</div>'
+
+    suggestions = []
+    if "NO_NS" in zw_text or "No NS records" in zw_text:
+        suggestions.append("🔴 <b>No nameservers</b> — point the domain to ns1.hostserv.co.za / ns2.hostserv.co.za")
+    if "NO_A_RECORD" in zw_text:
+        suggestions.append("🔴 <b>No A record</b> — add an A record pointing to your server IP")
+    if "NO_MX" in zw_text or "No MX records" in zw_text:
+        suggestions.append("🔴 <b>No MX records</b> — add MX records for mail delivery")
+    if "NO_SPF" in zw_text:
+        suggestions.append("🟡 <b>Missing SPF</b> — add: <code>v=spf1 a mx include:relay.mailchannels.net ~all</code>")
+    if "NO_DKIM" in zw_text:
+        suggestions.append("🟡 <b>Missing DKIM</b> — configure DKIM signing on your mail server")
+    if "NO_DMARC" in zw_text:
+        suggestions.append("🟡 <b>Missing DMARC</b> — add a DMARC policy to control email handling")
+    if "NOT_GRID" in zw_text:
+        suggestions.append("ℹ️ <b>Not a 1-grid domain</b> — check with the domain registrar for DNS changes")
+    if "SSL_EXP" in zw_text or "expired" in zw_text.lower():
+        suggestions.append("🔴 <b>SSL cert expired</b> — renew immediately to avoid browser warnings")
+
+    if suggestions:
+        summary_html += '<div style="margin-top:8px;border-top:1px solid #334155;padding-top:6px">'
+        summary_html += '<b style="color:#60a5fa;font-size:12px">💡 Suggestions:</b>'
+        for s in suggestions:
+            summary_html += f'<div style="font-size:12px;margin-top:4px;color:#cbd5e1">{s}</div>'
+        summary_html += '</div>'
+
+    if fail_count == 0:
+        summary_html += '<div style="margin-top:8px;color:#4ade80;font-size:12px">✅ No issues found — domain looks healthy!</div>'
+    else:
+        summary_html += f'<div style="margin-top:8px;color:#94a3b8;font-size:11px">Found {fail_count} issue(s) — review the suggestions above or check the zonewalk details.</div>'
+
+    summary_html += '</div></div>'
+    yield _ssse("status", {"text": ""})
+    yield _ssse("html", {"html": summary_html})
+    summary_text = f"Domain {domain} diagnosed with {fail_count} issues"
+    sessions.add_message(session_id, "assistant", summary_text)
+
+    # ── Log everything from this diagnosis ──
+    await _log_exchange(session_id, f"{domain} {issue}", summary_text,
+                        domain, ["zonewalk", "kb_search", "history_check", "ai_analysis"],
+                        zw_text=zw_text[:500])
 
     yield _ssse("done", {})
 

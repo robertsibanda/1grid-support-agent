@@ -6,6 +6,15 @@
 <title>1-grid Support Agent</title>
 <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 <script src="https://unpkg.com/htmx.org@2.0.4/dist/ext/response-targets.js"></script>
+<script>
+  var BASE = '/portal';
+  // Prepend BASE to all HTMX requests
+  htmx.on('htmx:configRequest', function(evt) {
+    if (!evt.detail.path.startsWith(BASE)) {
+      evt.detail.path = BASE + evt.detail.path;
+    }
+  });
+</script>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#0b1120;color:#e2e8f0;display:flex;height:100vh}
@@ -109,7 +118,7 @@
   .article-view .body{font-size:13px;line-height:1.7;color:#cbd5e1;white-space:pre-wrap}
   .article-view .back{font-size:12px;color:#2563eb;cursor:pointer;margin-bottom:8px;display:inline-block;text-decoration:none}
   .article-view .back:hover{text-decoration:underline}
-  .welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;padding:40px 20px}
+  .welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px}
   .welcome h2{font-size:18px;color:#f1f5f9;margin-bottom:6px}
   .welcome p{font-size:13px;color:#64748b;max-width:440px;line-height:1.6}
   .welcome .grid{margin-top:16px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
@@ -213,6 +222,8 @@
     chatSessionId = 'sess_' + Math.random().toString(36).substring(2,10) + Date.now().toString(36);
     localStorage.setItem('chat_session', chatSessionId);
   }
+  // Unique turn counter for each bot message (avoids ID conflicts across turns)
+  var chatTurnId = Date.now();
 
   function sendChat() {
     var input = document.getElementById('input');
@@ -223,6 +234,10 @@
     var msgs = document.getElementById('chat-messages');
     var sendBtn = document.getElementById('sendBtn');
     if (!msgs) return;
+
+    // Hide welcome
+    var welcome = document.querySelector('.welcome');
+    if (welcome) welcome.style.display = 'none';
 
     // Disable input during processing
     input.disabled = true;
@@ -237,8 +252,10 @@
     msgs.scrollTop = msgs.scrollHeight;
 
     // Create bot message container
+    var turnId = chatTurnId++;
     var botEl = document.createElement('div');
     botEl.className = 'msg bot';
+    botEl.dataset.turnId = turnId;
     msgs.appendChild(botEl);
     msgs.scrollTop = msgs.scrollHeight;
 
@@ -258,7 +275,7 @@
     var hasTokens = false;
 
     // Start streaming fetch
-    fetch('/chat/stream', {
+    fetch(BASE + '/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'message=' + encodeURIComponent(text) + '&session_id=' + encodeURIComponent(chatSessionId)
@@ -317,11 +334,16 @@
           // Append HTML content directly
           var div = document.createElement('div');
           div.innerHTML = data.html || '';
+          // Fix hardcoded IDs to be turn-specific
+          var aiFix = div.querySelector('#ai-analysis');
+          if (aiFix) aiFix.id = 'ai-analysis-' + turnId;
+          var tokFix = div.querySelector('#ai-tokens');
+          if (tokFix) tokFix.id = 'ai-tokens-' + turnId;
           contentEl.appendChild(div);
           msgs.scrollTop = msgs.scrollHeight;
         } else if (eventType === 'token') {
           hasTokens = true;
-          var aiTarget = document.getElementById('ai-tokens');
+          var aiTarget = document.getElementById('ai-tokens-' + turnId);
           if (aiTarget) {
             var txt = data.text || '';
             fullText += txt;
@@ -339,7 +361,7 @@
           msgs.scrollTop = msgs.scrollHeight;
         } else if (eventType === 'replace_last') {
           statusEl.innerHTML = '';
-          var aiContainer = document.getElementById('ai-analysis');
+          var aiContainer = document.getElementById('ai-analysis-' + turnId);
           if (aiContainer) {
             aiContainer.innerHTML = data.html || '';
           } else if (currentTokenDiv && currentTokenDiv.parentNode) {
@@ -436,13 +458,13 @@
     html += '</div>';
     panel.innerHTML = html;
   }
-  fetch('/health').then(function(r){return r.json()}).then(function(d){
+  fetch(BASE + '/health').then(function(r){return r.json()}).then(function(d){
     document.getElementById('sname').textContent = 'ok';
   }).catch(function(){
     document.getElementById('sdot').className = 'dot red';
     document.getElementById('sname').textContent = 'offline';
   });
-  fetch('/health/ollama').then(function(r){return r.json()}).then(function(d){
+  fetch(BASE + '/health/ollama').then(function(r){return r.json()}).then(function(d){
     document.getElementById('oname').textContent = d.status==='ok' ? 'Ollama' : 'Ollama off';
     document.getElementById('odot').className = d.status==='ok' ? 'dot green' : 'dot yellow';
   }).catch(function(){

@@ -3,8 +3,7 @@ import logging
 from datetime import datetime
 from app.agent.ollama_client import OllamaClient
 from app.agent.groq_client import GroqClient
-from app.rag.retriever import retrieve_context
-from app.warehouse.queries import WarehouseDB
+from app.warehouse.mongo_warehouse import MongoWarehouse
 from app.zonewalk.runner import run_zonewalk
 from app.config import settings
 
@@ -14,7 +13,7 @@ class SupportPipeline:
     def __init__(self):
         self.ollama = OllamaClient()
         self.groq = GroqClient()
-        self.warehouse = WarehouseDB()
+        self.warehouse = MongoWarehouse()
         self.use_groq = bool(settings.groq_api_key)
         if self.use_groq:
             logger.info(f"Using Groq API (model: {settings.groq_model})")
@@ -36,7 +35,6 @@ class SupportPipeline:
             domain_issues = self.warehouse.search_issues(domain)
             if domain_issues:
                 warehouse_history = json.dumps(domain_issues, indent=2)
-            server_info = self.warehouse.get_server(hostname="")
             steps[-1]["status"] = "done"
         except Exception as e:
             steps[-1]["status"] = "failed"
@@ -44,9 +42,17 @@ class SupportPipeline:
 
         steps.append({"step": "kb_retrieval", "status": "running"})
         try:
-            kb_context = retrieve_context(f"{domain} {issue}")
+            kb_articles = self.warehouse.search_kb(f"{domain} {issue}", 5)
+            kb_context = ""
+            if kb_articles:
+                parts = []
+                for a in kb_articles:
+                    title = a.get("title", "Untitled")
+                    content = (a.get("content", "") or "")[:800]
+                    parts.append(f"--- {title} ---\n{content}")
+                kb_context = "\n\n".join(parts)
             steps[-1]["status"] = "done"
-            steps[-1]["matches"] = len(kb_context) if kb_context else 0
+            steps[-1]["matches"] = len(kb_articles)
         except Exception as e:
             kb_context = ""
             steps[-1]["status"] = "failed"
@@ -118,7 +124,18 @@ class SupportPipeline:
 
     async def quick_diagnose(self, domain: str, issue: str = "") -> dict:
         zonewalk_result = run_zonewalk(domain)
-        kb_context = retrieve_context(f"{domain} {issue}")
+        kb_context = ""
+        try:
+            kb_articles = self.warehouse.search_kb(f"{domain} {issue}", 5)
+            if kb_articles:
+                parts = []
+                for a in kb_articles:
+                    title = a.get("title", "Untitled")
+                    content = (a.get("content", "") or "")[:800]
+                    parts.append(f"--- {title} ---\n{content}")
+                kb_context = "\n\n".join(parts)
+        except Exception:
+            kb_context = ""
 
         llm = self.groq if self.use_groq else self.ollama
         diagnosis = await llm.diagnose(
